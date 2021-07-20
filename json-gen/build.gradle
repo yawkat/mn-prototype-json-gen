@@ -1,0 +1,29 @@
+dependencies {
+    annotationProcessor "io.micronaut:micronaut-inject-java"
+    annotationProcessor "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion"
+
+    compileOnly "io.micronaut:micronaut-management"
+    compileOnly "io.micronaut:micronaut-inject-java"
+
+    // todo: extract version
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.12.4'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.12.4'
+    implementation 'com.squareup:javapoet:1.13.0'
+
+    testImplementation "org.spockframework:spock-core:$spockVersion"
+    testImplementation "io.micronaut:micronaut-runtime"
+    testImplementation "io.micronaut.security:micronaut-security"
+    testImplementation "io.micronaut:micronaut-inject-groovy"
+    testImplementation "io.micronaut:micronaut-inject-java"
+    testImplementation "io.micronaut:micronaut-inject-java-test"
+    testImplementation "io.micronaut.beanvalidation:micronaut-hibernate-validator"
+    testImplementation "io.reactivex.rxjava2:rxjava:$rxJava2Version"
+    testImplementation "io.micronaut:micronaut-management"
+    if (org.gradle.internal.jvm.Jvm.current().getJavaVersion().isJava8()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+}
+
+test {
+    useJUnitPlatform()
+}

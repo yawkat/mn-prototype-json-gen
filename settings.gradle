@@ -1,0 +1,2 @@
+rootProject.name = 'prototype-json-gen'
+include 'json-gen'

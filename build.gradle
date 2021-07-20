@@ -1,0 +1,27 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:4.0.0"
+    }
+}
+
+subprojects { Project subproject ->
+    group "io.micronaut.openapi" // todo
+
+    apply plugin: "io.micronaut.build.internal.common"
+    apply plugin: "io.micronaut.build.internal.dependency-updates"
+    apply plugin: "io.micronaut.build.internal.publishing"
+
+    tasks.withType(Test) {
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+            jvmArgs "--enable-preview"
+        }
+    }
+}
+
+
+apply plugin: "io.micronaut.build.internal.docs"
+apply plugin: "io.micronaut.build.internal.dependency-updates"
