@@ -19,10 +19,12 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec {
 
     CompiledBean<?> buildSerializer(String cls) {
         def classElement = buildClassElement(cls)
-        def serializerCode = new BeanSerializerGenerator(classElement).generate()
+
+        def generator = new BeanSerializerGenerator(classElement)
+        def serializerCode = generator.generate()
         def files = newJavaParser().generate(
                 new StringSourceJavaFileObject(classElement.name, cls),
-                new StringSourceJavaFileObject(classElement.name + '$Serializer', serializerCode.toString())
+                new StringSourceJavaFileObject(generator.qualifiedName.toString(), serializerCode.toString())
         )
 
         ClassLoader classLoader = new ClassLoader() {
