@@ -2,14 +2,13 @@ package io.micronaut.jsongen.bean
 
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonFactoryBuilder
-import com.fasterxml.jackson.core.JsonGenerator
 import groovy.transform.Immutable
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.jsongen.Serializer
+import io.micronaut.jsongen.generator.SerializerLinker
 
 import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
-import java.lang.reflect.Constructor
 import java.nio.charset.Charset
 
 import static javax.tools.JavaFileObject.Kind.SOURCE
@@ -20,7 +19,7 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec {
     CompiledBean<?> buildSerializer(String cls) {
         def classElement = buildClassElement(cls)
 
-        def generator = new BeanSerializerGenerator(classElement)
+        def generator = new BeanSerializerGenerator(new SerializerLinker(), classElement)
         def serializerCode = generator.generate()
         def files = newJavaParser().generate(
                 new StringSourceJavaFileObject(classElement.name, cls),

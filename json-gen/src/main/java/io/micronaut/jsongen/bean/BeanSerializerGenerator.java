@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.squareup.javapoet.*;
-import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.jsongen.Serializer;
+import io.micronaut.jsongen.generator.PoetUtil;
+import io.micronaut.jsongen.generator.SerializerLinker;
+import io.micronaut.jsongen.generator.SerializerSymbol;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -18,11 +20,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static io.micronaut.jsongen.generator.Names.*;
+
 public class BeanSerializerGenerator {
-    private static final String ENCODER = "encoder";
-    private static final String DECODER = "decoder";
     private static final String VALUE = "value";
     private static final String INSTANCE = "INSTANCE";
+
+    private final SerializerLinker linker;
 
     private final ClassElement clazz;
     private final BeanDefinition definition;
@@ -39,7 +43,8 @@ public class BeanSerializerGenerator {
      */
     private final Map<String, String> sanitizedPropertyNames;
 
-    public BeanSerializerGenerator(ClassElement clazz) {
+    public BeanSerializerGenerator(SerializerLinker linker, ClassElement clazz) {
+        this.linker = linker;
         this.clazz = clazz;
         this.definition = BeanIntrospector.introspect(clazz);
 
@@ -65,7 +70,7 @@ public class BeanSerializerGenerator {
     public JavaFile generate() {
         TypeSpec serializer = TypeSpec.classBuilder(qualifiedName.simpleName())
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                .addSuperinterface(ParameterizedTypeName.get(ClassName.get(Serializer.class), toTypeName(clazz)))
+                .addSuperinterface(ParameterizedTypeName.get(ClassName.get(Serializer.class), PoetUtil.toTypeName(clazz)))
                 .addField(FieldSpec.builder(qualifiedName, INSTANCE)
                         .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
                         .initializer("new $T()", qualifiedName)
@@ -77,7 +82,7 @@ public class BeanSerializerGenerator {
                         .addAnnotation(Override.class)
                         .addModifiers(Modifier.PUBLIC)
                         .addParameter(JsonGenerator.class, ENCODER)
-                        .addParameter(toTypeName(clazz), VALUE)
+                        .addParameter(PoetUtil.toTypeName(clazz), VALUE)
                         .addException(IOException.class)
                         .addCode(generateSerialize())
                         .build())
@@ -85,7 +90,7 @@ public class BeanSerializerGenerator {
                         .addAnnotation(Override.class)
                         .addModifiers(Modifier.PUBLIC)
                         .addParameter(JsonParser.class, DECODER)
-                        .returns(toTypeName(clazz)) // todo: specialize for generics?
+                        .returns(PoetUtil.toTypeName(clazz)) // todo: specialize for generics?
                         .addException(IOException.class)
                         .addCode(generateDeserialize())
                         .build())
@@ -120,37 +125,7 @@ public class BeanSerializerGenerator {
         } else {
             throw new UnsupportedOperationException(); // TODO
         }
-        return serializeValue(type, readExpression);
-    }
-
-    private CodeBlock serializeValue(ClassElement type, String readExpression) {
-        if (type.isArray()) {
-            return serializeIterableLike(readExpression, type.fromArray());
-        }
-        if (type.isAssignable(Iterable.class)) {
-            return serializeIterableLike(readExpression, type.getTypeArguments(Iterable.class).get("T"));
-        }
-        // todo: maps, special primitive arrays, bytes...
-        if (type.isPrimitive()) {
-            // type.isArray is checked above
-            if (type.equals(PrimitiveElement.BOOLEAN)) {
-                return CodeBlock.of(ENCODER + ".writeBoolean(" + readExpression + ");\n");
-            } else {
-                return CodeBlock.of(ENCODER + ".writeNumber(" + readExpression + ");\n");
-            }
-        }
-        if (type.isAssignable(String.class)) {
-            return CodeBlock.of(ENCODER + ".writeString(" + readExpression + ");\n");
-        }
-        return CodeBlock.of("$T.$N.serialize(" + readExpression + ")", ClassName.get(type.getPackageName(), type.getSimpleName() + "$Serializer"), INSTANCE);
-    }
-
-    private CodeBlock serializeIterableLike(String readExpression, ClassElement elementType) {
-        return CodeBlock.builder()
-                .beginControlFlow("for ($T item : " + readExpression + ")", toTypeName(elementType))
-                .add(serializeValue(elementType, "item"))
-                .endControlFlow()
-                .build();
+        return linker.findSymbolForSerialize(type).serialize(type, CodeBlock.of(readExpression));
     }
 
     private CodeBlock generateDeserialize() {
@@ -169,7 +144,7 @@ public class BeanSerializerGenerator {
         }));
         // create a local variable for each property
         for (BeanDefinition.Property prop : definition.props.values()) {
-            deserialize.addStatement("$T $N = " + getDefaultValueExpression(deserializeTypes.get(prop)), toTypeName(deserializeTypes.get(prop)), sanitizedPropertyNames.get(prop.name));
+            deserialize.addStatement("$T $N = " + getDefaultValueExpression(deserializeTypes.get(prop)), PoetUtil.toTypeName(deserializeTypes.get(prop)), sanitizedPropertyNames.get(prop.name));
         }
 
         // main parse loop
@@ -177,11 +152,16 @@ public class BeanSerializerGenerator {
         deserialize.addStatement("$T token = $N.nextToken()", JsonToken.class, DECODER);
         deserialize.add("if (token == $T.END_OBJECT) break;\n", JsonToken.class);
         deserialize.add("if (token != $T.FIELD_NAME) throw new $T();\n", JsonToken.class, IOException.class); // todo: error msg
-        deserialize.beginControlFlow("switch ($N.getCurrentName())", DECODER);
+        deserialize.addStatement("String fieldName = $N.getCurrentName()", DECODER);
+        deserialize.addStatement("$N.nextToken()", DECODER);
+        deserialize.beginControlFlow("switch (fieldName)", DECODER);
         for (BeanDefinition.Property prop : definition.props.values()) {
             deserialize.beginControlFlow("case $S:", prop.name);
             // TODO: check for duplicate field
-            deserialize.addStatement("$N = " + deserializeValue(deserialize, deserializeTypes.get(prop)), sanitizedPropertyNames.get(prop.name));
+            ClassElement propType = deserializeTypes.get(prop);
+            SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType).deserialize(propType);
+            deserialize.add(deserializationCode.getStatements());
+            deserialize.addStatement("$N = " + deserializationCode.getResultExpression(), sanitizedPropertyNames.get(prop.name));
             deserialize.addStatement("break");
             deserialize.endControlFlow();
         }
@@ -194,10 +174,10 @@ public class BeanSerializerGenerator {
 
         // todo: @JsonCreator
         if (definition.defaultConstructor instanceof ConstructorElement) {
-            deserialize.addStatement("$T result = new $T()", toTypeName(clazz), toTypeName(clazz));
+            deserialize.addStatement("$T result = new $T()", PoetUtil.toTypeName(clazz), PoetUtil.toTypeName(clazz));
         } else if (definition.defaultConstructor.isStatic()) {
             // TODO edge cases?
-            deserialize.addStatement("$T result = $T.$N()", toTypeName(clazz), toTypeName(definition.defaultConstructor.getDeclaringType()), definition.defaultConstructor.getName());
+            deserialize.addStatement("$T result = $T.$N()", PoetUtil.toTypeName(clazz), PoetUtil.toTypeName(definition.defaultConstructor.getDeclaringType()), definition.defaultConstructor.getName());
         } else {
             throw new UnsupportedOperationException("Creator must be static method or constructor");
         }
@@ -217,61 +197,6 @@ public class BeanSerializerGenerator {
         return deserialize.build();
     }
 
-    /**
-     * @return The expression string that gives the final value. Must only be evaluated once, immediately after the code generated by this method.
-     */
-    private String deserializeValue(CodeBlock.Builder currentBlock, ClassElement type) {
-        if (type.isArray()) {
-            ClassElement elementType = type.fromArray();
-            currentBlock.addStatement("$T<$T> list = new $T<>()", List.class, toTypeName(elementType), ArrayList.class);
-            currentBlock.add(deserializeCollection("list", elementType));
-            currentBlock.addStatement("$T array = list.toArray(new $T[0])", type, type.fromArray());
-            return "array";
-        }
-        if (type.isAssignable(Iterable.class)) {
-            // TODO: find proper collection implementation
-            throw new UnsupportedOperationException();
-        }
-        // todo: maps, special primitive arrays, bytes...
-        if (type.isPrimitive()) {
-            // type.isArray is checked above
-            if (type.equals(PrimitiveElement.BOOLEAN)) {
-                return DECODER + ".nextBooleanValue()";
-            } else if (type.equals(PrimitiveElement.BYTE)) {
-                return DECODER + ".nextByteValue()";
-            } else if (type.equals(PrimitiveElement.SHORT)) {
-                return DECODER + ".nextByteValue()";
-            } else if (type.equals(PrimitiveElement.CHAR)) {
-                return "(char) " + DECODER + ".nextIntValue()"; // TODO
-            } else if (type.equals(PrimitiveElement.INT)) {
-                return DECODER + ".nextIntValue()";
-            } else if (type.equals(PrimitiveElement.LONG)) {
-                return DECODER + ".nextLongValue()";
-            } else if (type.equals(PrimitiveElement.FLOAT)) {
-                return DECODER + ".nextFloatValue()";
-            } else if (type.equals(PrimitiveElement.DOUBLE)) {
-                return DECODER + ".nextDoubleValue()";
-            } else {
-                throw new AssertionError("unknown primitive type " + type);
-            }
-        }
-        if (type.getName().equals("java.lang.String") || type.getName().equals("java.lang.CharSequence")) {
-            return DECODER + ".nextTextValue()";
-        }
-        currentBlock.addStatement(
-                "$T value = $T.$N.deserialize(" + DECODER + ")",
-                toTypeName(type),
-                INSTANCE,
-                ClassName.get(type.getPackageName(), type.getSimpleName() + "$Serializer") // todo: nested types
-        );
-        return "value";
-    }
-
-    private CodeBlock deserializeCollection(String collectionVariable, ClassElement elementType) {
-        // TODO
-        throw new UnsupportedOperationException();
-    }
-
     private static String getDefaultValueExpression(ClassElement clazz) {
         if (clazz.isPrimitive() && !clazz.isArray()) {
             if (clazz.equals(PrimitiveElement.VOID)) {
@@ -286,29 +211,4 @@ public class BeanSerializerGenerator {
         }
     }
 
-    private static TypeName toTypeName(ClassElement clazz) {
-        if (clazz.isArray()) {
-            return ArrayTypeName.of(toTypeName(clazz.fromArray()));
-        }
-        if (clazz.isPrimitive()) {
-            if (clazz.equals(PrimitiveElement.BYTE)) return TypeName.BYTE;
-            else if (clazz.equals(PrimitiveElement.SHORT)) return TypeName.SHORT;
-            else if (clazz.equals(PrimitiveElement.CHAR)) return TypeName.CHAR;
-            else if (clazz.equals(PrimitiveElement.INT)) return TypeName.INT;
-            else if (clazz.equals(PrimitiveElement.LONG)) return TypeName.LONG;
-            else if (clazz.equals(PrimitiveElement.FLOAT)) return TypeName.FLOAT;
-            else if (clazz.equals(PrimitiveElement.DOUBLE)) return TypeName.DOUBLE;
-            else if (clazz.equals(PrimitiveElement.BOOLEAN)) return TypeName.BOOLEAN;
-            else if (clazz.equals(PrimitiveElement.VOID)) return TypeName.VOID;
-            else throw new AssertionError("unknown primitive type " + clazz);
-        }
-        ClassName className = ClassName.get(clazz.getPackageName(), clazz.getSimpleName()); // TODO: nested types
-        Map<String, ClassElement> typeArguments = clazz.getTypeArguments();
-        if (typeArguments.isEmpty()) {
-            return className;
-        } else {
-            // TODO
-            throw new UnsupportedOperationException();
-        }
-    }
 }
