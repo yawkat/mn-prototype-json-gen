@@ -13,9 +13,10 @@ import io.micronaut.jsongen.Serializer
 import io.micronaut.jsongen.SerializerUtils
 
 import javax.lang.model.element.Modifier
+import java.lang.reflect.Type
 
 class AbstractSymbolSpec extends AbstractTypeElementSpec implements SerializerUtils {
-    public <T> Serializer<T> buildBasicSerializer(Class<T> type, SerializerSymbol symbol, ClassElement classElement = ClassElement.of(type)) {
+    public <T> Serializer<T> buildBasicSerializer(Type type, SerializerSymbol symbol, ClassElement classElement = ClassElement.of(type)) {
         def deserCode = symbol.deserialize(classElement)
         def javaFile = JavaFile.builder("example", TypeSpec.classBuilder("Test")
                 .addModifiers(Modifier.PUBLIC)

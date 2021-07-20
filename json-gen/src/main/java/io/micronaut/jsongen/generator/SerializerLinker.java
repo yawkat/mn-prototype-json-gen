@@ -5,8 +5,8 @@ import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
 
 public class SerializerLinker {
-    private final InlineIterableSerializerSymbol.Array array = new InlineIterableSerializerSymbol.Array(this);
-    private final InlineIterableSerializerSymbol.ArrayList arrayList = new InlineIterableSerializerSymbol.ArrayList(this);
+    final InlineIterableSerializerSymbol.ArrayImpl array = new InlineIterableSerializerSymbol.ArrayImpl(this);
+    final InlineIterableSerializerSymbol.ArrayListImpl arrayList = new InlineIterableSerializerSymbol.ArrayListImpl(this);
 
     public SerializerSymbol findSymbolForSerialize(ClassElement type) {
         return findSymbolGeneric(type);

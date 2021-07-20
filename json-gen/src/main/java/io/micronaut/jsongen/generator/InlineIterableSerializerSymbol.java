@@ -5,12 +5,15 @@ import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
+import static io.micronaut.jsongen.generator.Names.ENCODER;
 
 /**
- * {@link SerializerSymbol} that deserializes iterables (and arrays) inline, i.e. without a separate {@link io.micronaut.jsongen.Serializer} implementation.
+ * {@link SerializerSymbol} that deserializes iterables (and arrays) inline, i.e. without a separate
+ * {@link io.micronaut.jsongen.Serializer} implementation.
  */
 abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     protected static final String INTERMEDIATE = "collection";
@@ -28,9 +31,11 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         ClassElement elementType = getElementType(type);
         SerializerSymbol elementSerializer = linker.findSymbolForSerialize(elementType);
         return CodeBlock.builder()
+                .addStatement("$N.writeStartArray();", ENCODER)
                 .beginControlFlow("for ($T item : " + readExpression + ")", PoetUtil.toTypeName(elementType))
                 .add(elementSerializer.serialize(elementType, CodeBlock.of("item")))
                 .endControlFlow()
+                .addStatement("$N.writeEndArray();", ENCODER)
                 .build();
     }
 
@@ -40,15 +45,14 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         SerializerSymbol elementDeserializer = linker.findSymbolForDeserialize(elementType);
 
         CodeBlock.Builder block = CodeBlock.builder();
-        block.add("if ($N.currentToken() != $T.START_ARRAY) throw $T()", DECODER, JsonToken.class, IOException.class); // TODO: error msg
+        block.add("if ($N.currentToken() != $T.START_ARRAY) throw new $T();\n", DECODER, JsonToken.class, IOException.class); // TODO: error msg
         block.add(createIntermediate(elementType));
-        block.addStatement("$T<$T> list = new $T<>()", ArrayList.class, PoetUtil.toTypeName(elementType), ArrayList.class);
         block.beginControlFlow("while ($N.nextToken() != $T.END_ARRAY)", DECODER, JsonToken.class);
 
         DeserializationCode elementDeserCode = elementDeserializer.deserialize(elementType);
         block.add(elementDeserCode.getStatements());
         // todo: name collision on nested lists?
-        block.addStatement("list.add(" + elementDeserCode.getResultExpression() + ")");
+        block.addStatement("$N.add(" + elementDeserCode.getResultExpression() + ")", INTERMEDIATE);
 
         block.endControlFlow();
         return new DeserializationCode(
@@ -58,13 +62,13 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     }
 
     protected CodeBlock createIntermediate(ClassElement elementType) {
-        return CodeBlock.of("$T<$T> $N = new $T<>();", List.class, ArrayList.class);
+        return CodeBlock.of("$T<$T> $N = new $T<>();", ArrayList.class, PoetUtil.toTypeName(elementType), INTERMEDIATE, ArrayList.class);
     }
 
     protected abstract CodeBlock finishDeserialize(ClassElement elementType);
 
-    static class Array extends InlineIterableSerializerSymbol {
-        Array(SerializerLinker linker) {
+    static class ArrayImpl extends InlineIterableSerializerSymbol {
+        ArrayImpl(SerializerLinker linker) {
             super(linker);
         }
 
@@ -82,8 +86,8 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     /**
      * Can also do {@link Iterable} and {@link List}
      */
-    static class ArrayList extends InlineIterableSerializerSymbol {
-        ArrayList(SerializerLinker linker) {
+    static class ArrayListImpl extends InlineIterableSerializerSymbol {
+        ArrayListImpl(SerializerLinker linker) {
             super(linker);
         }
 
