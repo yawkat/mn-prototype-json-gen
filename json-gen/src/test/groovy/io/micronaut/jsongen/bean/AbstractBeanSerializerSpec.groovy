@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonFactoryBuilder
 import groovy.transform.Immutable
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.jsongen.Serializer
+import io.micronaut.jsongen.SerializerUtils
 import io.micronaut.jsongen.generator.SerializerLinker
 
 import javax.tools.JavaFileObject
@@ -13,9 +14,7 @@ import java.nio.charset.Charset
 
 import static javax.tools.JavaFileObject.Kind.SOURCE
 
-class AbstractBeanSerializerSpec extends AbstractTypeElementSpec {
-    static final JsonFactory JSON_FACTORY = new JsonFactoryBuilder().build();
-
+class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements SerializerUtils {
     CompiledBean<?> buildSerializer(String cls) {
         def classElement = buildClassElement(cls)
 
@@ -110,13 +109,5 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec {
         public long getLastModified() {
             return lastModified;
         }
-    }
-
-    static <T> String serializeToString(Serializer<T> serializer, T value) {
-        def writer = new StringWriter()
-        def generator = JSON_FACTORY.createGenerator(writer)
-        serializer.serialize(generator, value)
-        generator.close()
-        return writer.toString()
     }
 }

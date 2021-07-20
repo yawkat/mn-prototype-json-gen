@@ -35,7 +35,7 @@ class PrimitiveSerializerSymbol implements SerializerSymbol {
         } else if (type.equals(PrimitiveElement.BYTE)) {
             return DECODER + ".getByteValue()";
         } else if (type.equals(PrimitiveElement.SHORT)) {
-            return DECODER + ".getByteValue()";
+            return DECODER + ".getShortValue()";
         } else if (type.equals(PrimitiveElement.CHAR)) {
             return "(char) " + DECODER + ".getIntValue()"; // TODO
         } else if (type.equals(PrimitiveElement.INT)) {
