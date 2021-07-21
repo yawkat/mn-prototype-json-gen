@@ -1,7 +1,6 @@
-package io.micronaut.jsongen.bean;
+package io.micronaut.jsongen.generator.bean;
 
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 

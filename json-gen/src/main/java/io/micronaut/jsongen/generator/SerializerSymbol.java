@@ -1,6 +1,5 @@
 package io.micronaut.jsongen.generator;
 
-import com.fasterxml.jackson.core.JsonParser;
 import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
 
@@ -8,9 +7,10 @@ public interface SerializerSymbol {
     /**
      * Generate code that writes the value returned by {@code readExpression} into {@link Names#ENCODER}.
      *
+     * @param generatorContext
      * @param readExpression The expression that reads the value. Must only be evaluated once.
      */
-    CodeBlock serialize(ClassElement type, CodeBlock readExpression);
+    CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression);
 
     /**
      * Generate code that reads a value from {@link Names#DECODER}.
@@ -18,7 +18,7 @@ public interface SerializerSymbol {
      * Decoder should be positioned at the first token of the value (as specified by
      * {@link io.micronaut.jsongen.Serializer#deserialize})
      */
-    DeserializationCode deserialize(ClassElement type);
+    DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type);
 
     class DeserializationCode {
         /**

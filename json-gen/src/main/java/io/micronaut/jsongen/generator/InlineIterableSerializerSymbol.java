@@ -17,8 +17,6 @@ import static io.micronaut.jsongen.generator.Names.ENCODER;
  * {@link io.micronaut.jsongen.Serializer} implementation.
  */
 abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
-    protected static final String INTERMEDIATE = "collection";
-
     private final SerializerLinker linker;
 
     InlineIterableSerializerSymbol(SerializerLinker linker) {
@@ -29,45 +27,47 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     protected abstract ClassElement getElementType(ClassElement type);
 
     @Override
-    public CodeBlock serialize(ClassElement type, CodeBlock readExpression) {
+    public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         ClassElement elementType = getElementType(type);
         SerializerSymbol elementSerializer = linker.findSymbolForSerialize(elementType);
         return CodeBlock.builder()
                 .addStatement("$N.writeStartArray()", ENCODER)
                 .beginControlFlow("for ($T item : $L)", PoetUtil.toTypeName(elementType), readExpression)
-                .add(elementSerializer.serialize(elementType, CodeBlock.of("item")))
+                .add(elementSerializer.serialize(generatorContext, elementType, CodeBlock.of("item")))
                 .endControlFlow()
                 .addStatement("$N.writeEndArray()", ENCODER)
                 .build();
     }
 
     @Override
-    public DeserializationCode deserialize(ClassElement type) {
+    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
         ClassElement elementType = getElementType(type);
         SerializerSymbol elementDeserializer = linker.findSymbolForDeserialize(elementType);
 
+        String intermediateVariable = generatorContext.newLocalVariable("intermediate");
+
         CodeBlock.Builder block = CodeBlock.builder();
         block.add("if ($N.currentToken() != $T.START_ARRAY) throw new $T();\n", DECODER, JsonToken.class, IOException.class); // TODO: error msg
-        block.add(createIntermediate(elementType));
+        block.add(createIntermediate(elementType, intermediateVariable));
         block.beginControlFlow("while ($N.nextToken() != $T.END_ARRAY)", DECODER, JsonToken.class);
 
-        DeserializationCode elementDeserCode = elementDeserializer.deserialize(elementType);
+        DeserializationCode elementDeserCode = elementDeserializer.deserialize(generatorContext, elementType);
         block.add(elementDeserCode.getStatements());
         // todo: name collision on nested lists?
-        block.addStatement("$N.add($L)", INTERMEDIATE, elementDeserCode.getResultExpression());
+        block.addStatement("$N.add($L)", intermediateVariable, elementDeserCode.getResultExpression());
 
         block.endControlFlow();
         return new DeserializationCode(
                 block.build(),
-                finishDeserialize(elementType)
+                finishDeserialize(elementType, intermediateVariable)
         );
     }
 
-    protected CodeBlock createIntermediate(ClassElement elementType) {
-        return CodeBlock.of("$T<$T> $N = new $T<>();", ArrayList.class, PoetUtil.toTypeName(elementType), INTERMEDIATE, ArrayList.class);
+    protected CodeBlock createIntermediate(ClassElement elementType, String intermediateVariable) {
+        return CodeBlock.of("$T<$T> $N = new $T<>();", ArrayList.class, PoetUtil.toTypeName(elementType), intermediateVariable, ArrayList.class);
     }
 
-    protected abstract CodeBlock finishDeserialize(ClassElement elementType);
+    protected abstract CodeBlock finishDeserialize(ClassElement elementType, String intermediateVariable);
 
     static class ArrayImpl extends InlineIterableSerializerSymbol {
         ArrayImpl(SerializerLinker linker) {
@@ -81,8 +81,8 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         }
 
         @Override
-        protected CodeBlock finishDeserialize(ClassElement elementType) {
-            return CodeBlock.of("$N.toArray(new $T[0])", INTERMEDIATE, PoetUtil.toTypeName(elementType));
+        protected CodeBlock finishDeserialize(ClassElement elementType, String intermediateVariable) {
+            return CodeBlock.of("$N.toArray(new $T[0])", intermediateVariable, PoetUtil.toTypeName(elementType));
         }
     }
 
@@ -110,8 +110,8 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         }
 
         @Override
-        protected CodeBlock finishDeserialize(ClassElement elementType) {
-            return CodeBlock.of(INTERMEDIATE);
+        protected CodeBlock finishDeserialize(ClassElement elementType, String intermediateVariable) {
+            return CodeBlock.of("$N", intermediateVariable);
         }
     }
 }

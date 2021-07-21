@@ -1,12 +1,12 @@
 package io.micronaut.jsongen.generator;
 
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol;
 
 public class SerializerLinker {
     final InlineIterableSerializerSymbol.ArrayImpl array = new InlineIterableSerializerSymbol.ArrayImpl(this);
     final InlineIterableSerializerSymbol.ArrayListImpl arrayList = new InlineIterableSerializerSymbol.ArrayListImpl(this);
+    final InlineBeanSerializerSymbol bean = new InlineBeanSerializerSymbol(this);
 
     public SerializerSymbol findSymbolForSerialize(ClassElement type) {
         return findSymbolGeneric(type);
@@ -37,18 +37,7 @@ public class SerializerLinker {
             // todo: this exists for fail-fast debugging for now, maybe we can fill Object fields with Maps/Lists at some point
             throw new IllegalArgumentException("Cannot deserialize Object");
         }
-        return new SerializerSymbol() {
-            private final ClassName serializerClassName = ClassName.get(type.getPackageName(), type.getSimpleName() + "$Serializer");
-
-            @Override
-            public CodeBlock serialize(ClassElement type, CodeBlock readExpression) {
-                return CodeBlock.of("$T.INSTANCE.serialize($N, $L);\n", serializerClassName, Names.ENCODER, readExpression);
-            }
-
-            @Override
-            public DeserializationCode deserialize(ClassElement type) {
-                return new DeserializationCode(CodeBlock.of("$T.INSTANCE.deserialize($N)", serializerClassName, Names.DECODER));
-            }
-        };
+        // todo: reuse already-generated Serializers
+        return bean;
     }
 }

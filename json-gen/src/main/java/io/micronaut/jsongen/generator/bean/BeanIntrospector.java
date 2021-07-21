@@ -1,6 +1,9 @@
-package io.micronaut.jsongen.bean;
+package io.micronaut.jsongen.generator.bean;
 
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
 
 class BeanIntrospector {
     public static BeanDefinition introspect(ClassElement clazz) {

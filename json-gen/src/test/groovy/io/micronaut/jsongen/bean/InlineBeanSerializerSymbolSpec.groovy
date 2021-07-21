@@ -1,8 +1,6 @@
 package io.micronaut.jsongen.bean
 
-import com.fasterxml.jackson.core.JsonFactory
-
-class BeanSerializerGeneratorSpec extends AbstractBeanSerializerSpec {
+class InlineBeanSerializerSymbolSpec extends AbstractBeanSerializerSpec {
     void "simple bean"() {
         given:
         def compiled = buildSerializer('''

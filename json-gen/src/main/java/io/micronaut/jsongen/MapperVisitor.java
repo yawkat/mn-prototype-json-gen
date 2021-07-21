@@ -1,13 +1,13 @@
 package io.micronaut.jsongen;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotation;
-import com.squareup.javapoet.JavaFile;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.jsongen.bean.BeanSerializerGenerator;
 import io.micronaut.jsongen.generator.SerializerLinker;
+import io.micronaut.jsongen.generator.SerializerSymbol;
+import io.micronaut.jsongen.generator.SingletonSerializerGenerator;
 
 import javax.tools.JavaFileObject;
 import java.io.IOException;
@@ -18,13 +18,14 @@ public class MapperVisitor implements TypeElementVisitor<Object, Object> {
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (element.hasStereotype(JacksonAnnotation.class)) {
-            BeanSerializerGenerator generator = new BeanSerializerGenerator(new SerializerLinker(), element);
-            JavaFile serializerFile = generator.generate();
+            SerializerLinker linker = new SerializerLinker();
+            SerializerSymbol symbol = linker.findSymbolForSerialize(element); // todo: move gen logic
+            SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(element, symbol);
             try {
                 // TODO: groovy context support
-                JavaFileObject sourceFile = ((JavaVisitorContext) context).getProcessingEnv().getFiler().createSourceFile(generator.getQualifiedName().toString());
+                JavaFileObject sourceFile = ((JavaVisitorContext) context).getProcessingEnv().getFiler().createSourceFile(result.serializerClassName.reflectionName());
                 try (Writer writer = sourceFile.openWriter()) {
-                    serializerFile.writeTo(writer);
+                    result.generatedFile.writeTo(writer);
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

@@ -13,7 +13,7 @@ class PrimitiveSerializerSymbol implements SerializerSymbol {
     private PrimitiveSerializerSymbol() {}
 
     @Override
-    public CodeBlock serialize(ClassElement type, CodeBlock readExpression) {
+    public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         if (type.equals(PrimitiveElement.BOOLEAN)) {
             return CodeBlock.of("$N.writeBoolean($L);\n", ENCODER, readExpression);
         } else {
@@ -22,7 +22,7 @@ class PrimitiveSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
-    public DeserializationCode deserialize(ClassElement type) {
+    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
         if (!type.isPrimitive() || type.isArray()) {
             throw new UnsupportedOperationException("This symbol can only handle primitives");
         }

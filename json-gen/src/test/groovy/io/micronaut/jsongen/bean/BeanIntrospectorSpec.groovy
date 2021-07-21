@@ -1,6 +1,7 @@
 package io.micronaut.jsongen.bean
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.jsongen.generator.bean.BeanIntrospector
 
 class BeanIntrospectorSpec extends AbstractTypeElementSpec {
     void "basic class"() {

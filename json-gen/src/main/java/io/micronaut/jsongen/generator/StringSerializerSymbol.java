@@ -12,13 +12,13 @@ class StringSerializerSymbol implements SerializerSymbol {
     private StringSerializerSymbol() {}
 
     @Override
-    public CodeBlock serialize(ClassElement type, CodeBlock readExpression) {
+    public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         // todo: handle charsequence
         return CodeBlock.of("$N.writeString($L);\n", ENCODER, readExpression);
     }
 
     @Override
-    public DeserializationCode deserialize(ClassElement type) {
+    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
         return new DeserializationCode(CodeBlock.of("$N.getText()", DECODER));
     }
 }
