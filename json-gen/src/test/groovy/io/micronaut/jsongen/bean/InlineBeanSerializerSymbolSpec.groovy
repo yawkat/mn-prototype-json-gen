@@ -30,4 +30,23 @@ class Test {
         deserialized.b == "bar"
         serialized == '{"a":"foo","b":"bar"}'
     }
+
+    void "JsonProperty on field"() {
+        given:
+        def compiled = buildSerializer('''
+import com.fasterxml.jackson.annotation.JsonProperty;
+class Test {
+    @JsonProperty("foo")
+    public String bar;
+}
+''')
+        def deserialized = deserializeFromString(compiled.serializer, '{"foo": "42"}')
+        def testBean = compiled.newInstance()
+        testBean.bar = "42"
+        def serialized = serializeToString(compiled.serializer, testBean)
+
+        expect:
+        deserialized.bar == "42"
+        serialized == '{"foo":"42"}'
+    }
 }

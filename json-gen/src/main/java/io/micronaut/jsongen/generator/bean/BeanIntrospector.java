@@ -1,9 +1,13 @@
 package io.micronaut.jsongen.generator.bean;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+
+import java.util.Optional;
 
 class BeanIntrospector {
     public static BeanDefinition introspect(ClassElement clazz) {
@@ -24,7 +28,14 @@ class BeanIntrospector {
             definition.defaultConstructor = clazz.getDefaultConstructor().orElse(null);
 
             for (FieldElement field : clazz.getFields()) {
+                AnnotationValue<JsonProperty> jsonProperty = field.getAnnotation(JsonProperty.class);
                 String name = field.getName();
+                if (jsonProperty != null) {
+                    Optional<String> value = jsonProperty.getValue(String.class);
+                    if (value.isPresent()) {
+                        name = value.get();
+                    }
+                }
                 BeanDefinition.Property property = definition.props.computeIfAbsent(name, BeanDefinition.Property::new);
                 property.field = field;
             }

@@ -6,6 +6,7 @@ import io.micronaut.jsongen.Serializer
 import io.micronaut.jsongen.SerializerUtils
 import io.micronaut.jsongen.generator.SerializerLinker
 import io.micronaut.jsongen.generator.SingletonSerializerGenerator
+import org.intellij.lang.annotations.Language
 
 import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
@@ -14,7 +15,7 @@ import java.nio.charset.Charset
 import static javax.tools.JavaFileObject.Kind.SOURCE
 
 class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements SerializerUtils {
-    CompiledBean<?> buildSerializer(String cls) {
+    CompiledBean<?> buildSerializer(@Language("java") String cls) {
         def classElement = buildClassElement(cls)
 
         def linker = new SerializerLinker()
