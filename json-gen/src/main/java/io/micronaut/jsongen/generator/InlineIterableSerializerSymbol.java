@@ -75,6 +75,11 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         }
 
         @Override
+        public boolean canSerialize(ClassElement type) {
+            return type.isArray();
+        }
+
+        @Override
         @NonNull
         protected ClassElement getElementType(ClassElement type) {
             return type.fromArray();
@@ -92,6 +97,14 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     static class ArrayListImpl extends InlineIterableSerializerSymbol {
         ArrayListImpl(SerializerLinker linker) {
             super(linker);
+        }
+
+        @Override
+        public boolean canSerialize(ClassElement type) {
+            return type.getName().equals("java.lang.Iterable") ||
+                    type.getName().equals("java.util.Collection") ||
+                    type.getName().equals("java.util.List") ||
+                    type.getName().equals("java.util.ArrayList");
         }
 
         @Override

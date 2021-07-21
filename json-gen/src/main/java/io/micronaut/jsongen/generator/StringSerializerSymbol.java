@@ -12,6 +12,11 @@ class StringSerializerSymbol implements SerializerSymbol {
     private StringSerializerSymbol() {}
 
     @Override
+    public boolean canSerialize(ClassElement type) {
+        return type.isAssignable(String.class);
+    }
+
+    @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         // todo: handle charsequence
         return CodeBlock.of("$N.writeString($L);\n", ENCODER, readExpression);

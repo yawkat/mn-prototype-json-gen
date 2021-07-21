@@ -25,6 +25,11 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
+    public boolean canSerialize(ClassElement type) {
+        return true;
+    }
+
+    @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         BeanDefinition definition = BeanIntrospector.introspect(type);
 

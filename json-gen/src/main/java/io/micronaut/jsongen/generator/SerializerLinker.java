@@ -3,41 +3,41 @@ package io.micronaut.jsongen.generator;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public class SerializerLinker {
     final InlineIterableSerializerSymbol.ArrayImpl array = new InlineIterableSerializerSymbol.ArrayImpl(this);
     final InlineIterableSerializerSymbol.ArrayListImpl arrayList = new InlineIterableSerializerSymbol.ArrayListImpl(this);
     final InlineBeanSerializerSymbol bean = new InlineBeanSerializerSymbol(this);
 
-    public SerializerSymbol findSymbolForSerialize(ClassElement type) {
+    private final List<SerializerSymbol> symbolList = new ArrayList<>(Arrays.asList(
+            array,
+            arrayList,
+            PrimitiveSerializerSymbol.INSTANCE,
+            StringSerializerSymbol.INSTANCE,
+            bean
+    ));
+
+    public final SerializerSymbol findSymbolForSerialize(ClassElement type) {
         return findSymbolGeneric(type);
     }
 
-    public SerializerSymbol findSymbolForDeserialize(ClassElement type) {
+    public final SerializerSymbol findSymbolForDeserialize(ClassElement type) {
         return findSymbolGeneric(type);
     }
 
-    private SerializerSymbol findSymbolGeneric(ClassElement type) {
-        if (type.isArray()) {
-            return array;
+    protected void registerSymbol(SerializerSymbol symbol) {
+        symbolList.add(0, symbol);
+    }
+
+    protected SerializerSymbol findSymbolGeneric(ClassElement type) {
+        for (SerializerSymbol serializerSymbol : symbolList) {
+            if (serializerSymbol.canSerialize(type)) {
+                return serializerSymbol;
+            }
         }
-        // todo: can this be prettier?
-        if (type.getName().equals("java.lang.Iterable") ||
-                type.getName().equals("java.util.Collection") ||
-                type.getName().equals("java.util.List") ||
-                type.getName().equals("java.util.ArrayList")) {
-            return arrayList;
-        }
-        if (type.isPrimitive()) {
-            return PrimitiveSerializerSymbol.INSTANCE;
-        }
-        if (type.isAssignable(String.class)) {
-            return StringSerializerSymbol.INSTANCE;
-        }
-        if (type.getName().equals("java.lang.Object")) {
-            // todo: this exists for fail-fast debugging for now, maybe we can fill Object fields with Maps/Lists at some point
-            throw new IllegalArgumentException("Cannot deserialize Object");
-        }
-        // todo: reuse already-generated Serializers
-        return bean;
+        throw new UnsupportedOperationException("No symbol for " + type);
     }
 }

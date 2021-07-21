@@ -4,10 +4,11 @@ import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
 
 public interface SerializerSymbol {
+    boolean canSerialize(ClassElement type);
+
     /**
      * Generate code that writes the value returned by {@code readExpression} into {@link Names#ENCODER}.
      *
-     * @param generatorContext
      * @param readExpression The expression that reads the value. Must only be evaluated once.
      */
     CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression);

@@ -13,6 +13,11 @@ class PrimitiveSerializerSymbol implements SerializerSymbol {
     private PrimitiveSerializerSymbol() {}
 
     @Override
+    public boolean canSerialize(ClassElement type) {
+        return type.isPrimitive() && !type.isArray() && !type.equals(PrimitiveElement.VOID);
+    }
+
+    @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         if (type.equals(PrimitiveElement.BOOLEAN)) {
             return CodeBlock.of("$N.writeBoolean($L);\n", ENCODER, readExpression);

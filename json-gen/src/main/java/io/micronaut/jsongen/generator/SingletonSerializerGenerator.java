@@ -8,6 +8,7 @@ import io.micronaut.jsongen.Serializer;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
+import java.util.Map;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
 import static io.micronaut.jsongen.generator.Names.ENCODER;
@@ -79,16 +80,24 @@ public class SingletonSerializerGenerator {
                 .addMethod(deserialize)
                 .build();
         JavaFile generatedFile = JavaFile.builder(serializerName.packageName(), serializer).build();
-        return new GenerationResult(serializerName, generatedFile);
+        return new GenerationResult(valueType, serializerName, generatedFile);
     }
 
     public static class GenerationResult implements SerializerSymbol {
+        private final ClassElement supportedValueType;
+
         public final ClassName serializerClassName;
         public final JavaFile generatedFile;
 
-        private GenerationResult(ClassName serializerClassName, JavaFile generatedFile) {
+        private GenerationResult(ClassElement supportedValueType, ClassName serializerClassName, JavaFile generatedFile) {
+            this.supportedValueType = supportedValueType;
             this.serializerClassName = serializerClassName;
             this.generatedFile = generatedFile;
+        }
+
+        @Override
+        public boolean canSerialize(ClassElement type) {
+            return isSameType(type, supportedValueType);
         }
 
         @Override
@@ -100,5 +109,18 @@ public class SingletonSerializerGenerator {
         public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
             return new DeserializationCode(CodeBlock.of("$T.$N.deserialize($N)", serializerClassName, INSTANCE_FIELD_NAME, Names.DECODER));
         }
+    }
+
+    private static boolean isSameType(ClassElement a, ClassElement b) {
+        if (!a.getName().equals(b.getName())) return false;
+        Map<String, ClassElement> aArgs = a.getTypeArguments();
+        Map<String, ClassElement> bArgs = b.getTypeArguments();
+        if (!aArgs.keySet().equals(bArgs.keySet())) return false;
+        for (String argument : aArgs.keySet()) {
+            if (!isSameType(aArgs.get(argument), bArgs.get(argument))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
