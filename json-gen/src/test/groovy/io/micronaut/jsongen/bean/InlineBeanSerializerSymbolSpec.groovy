@@ -49,4 +49,31 @@ class Test {
         deserialized.bar == "42"
         serialized == '{"foo":"42"}'
     }
+
+    void "JsonProperty on getter"() {
+        given:
+        def compiled = buildSerializer('''
+import com.fasterxml.jackson.annotation.JsonProperty;
+class Test {
+    private String bar;
+    
+    @JsonProperty("foo")
+    public String getBar() {
+        return bar;
+    }
+    
+    public void setBar(String bar) {
+        this.bar = bar;
+    }
+}
+''')
+        def deserialized = deserializeFromString(compiled.serializer, '{"foo": "42"}')
+        def testBean = compiled.newInstance()
+        testBean.bar = "42"
+        def serialized = serializeToString(compiled.serializer, testBean)
+
+        expect:
+        deserialized.bar == "42"
+        serialized == '{"foo":"42"}'
+    }
 }
