@@ -2,6 +2,7 @@ package io.micronaut.jsongen.generator;
 
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -30,10 +31,16 @@ public class PoetUtil {
         ClassName className = ClassName.get(clazz.getPackageName(), clazz.getSimpleName()); // TODO: nested types
         Map<String, ClassElement> typeArguments = clazz.getTypeArguments();
         if (typeArguments.isEmpty()) {
+            if (clazz.getName().equals("<any>")) {
+                // todo: investigate further. Seems to happen when the input source has unresolvable types
+                throw new IllegalArgumentException("Type resolution error?");
+            }
             return className;
         } else {
-            // TODO
-            throw new UnsupportedOperationException();
+            // we assume the typeArguments Map is ordered by source declaration
+            return ParameterizedTypeName.get(
+                    className,
+                    typeArguments.values().stream().map(PoetUtil::toTypeName).toArray(TypeName[]::new));
         }
     }
 }

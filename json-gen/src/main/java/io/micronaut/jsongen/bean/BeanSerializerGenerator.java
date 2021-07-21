@@ -15,13 +15,12 @@ import io.micronaut.jsongen.generator.SerializerSymbol;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static io.micronaut.jsongen.generator.Names.*;
+import static io.micronaut.jsongen.generator.Names.DECODER;
+import static io.micronaut.jsongen.generator.Names.ENCODER;
 
 public class BeanSerializerGenerator {
     private static final String VALUE = "value";
@@ -105,7 +104,7 @@ public class BeanSerializerGenerator {
         serialize.addStatement("$N.writeStartObject($N)", ENCODER, VALUE);
         for (BeanDefinition.Property prop : definition.props.values()) {
             serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
-            serialize.addStatement(serializeBeanProperty(prop));
+            serialize.add(serializeBeanProperty(prop));
         }
         serialize.addStatement("$N.writeEndObject()", ENCODER);
         return serialize.build();

@@ -24,7 +24,7 @@ public class MapperVisitor implements TypeElementVisitor<Object, Object> {
                 // TODO: groovy context support
                 JavaFileObject sourceFile = ((JavaVisitorContext) context).getProcessingEnv().getFiler().createSourceFile(generator.getQualifiedName().toString());
                 try (Writer writer = sourceFile.openWriter()) {
-                    writer.write(serializerFile.toString());
+                    serializerFile.writeTo(writer);
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

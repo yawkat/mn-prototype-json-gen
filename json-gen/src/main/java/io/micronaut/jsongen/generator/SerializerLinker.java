@@ -21,7 +21,10 @@ public class SerializerLinker {
             return array;
         }
         // todo: can this be prettier?
-        if (type.getName().equals("java.lang.Iterable") || type.getName().equals("java.util.List") || type.getName().equals("java.util.ArrayList")) {
+        if (type.getName().equals("java.lang.Iterable") ||
+                type.getName().equals("java.util.Collection") ||
+                type.getName().equals("java.util.List") ||
+                type.getName().equals("java.util.ArrayList")) {
             return arrayList;
         }
         if (type.isPrimitive()) {
@@ -29,6 +32,10 @@ public class SerializerLinker {
         }
         if (type.isAssignable(String.class)) {
             return StringSerializerSymbol.INSTANCE;
+        }
+        if (type.getName().equals("java.lang.Object")) {
+            // todo: this exists for fail-fast debugging for now, maybe we can fill Object fields with Maps/Lists at some point
+            throw new IllegalArgumentException("Cannot deserialize Object");
         }
         return new SerializerSymbol() {
             private final ClassName serializerClassName = ClassName.get(type.getPackageName(), type.getSimpleName() + "$Serializer");

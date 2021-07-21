@@ -1,9 +1,7 @@
 package io.micronaut.jsongen
 
-import com.fasterxml.jackson.core.JsonFactory
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
-import java.lang.reflect.Constructor
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class MapperVisitorSpec extends AbstractTypeElementSpec implements SerializerUtils {
     void "generator creates a serializer for jackson annotations"() {
@@ -66,5 +64,33 @@ class B {
         deserializeFromString(serializerB, '{"foo":"456"}').foo == "456"
         deserializeFromString(serializerA, '{"b":{"foo":"456"},"bar":"123"}').bar == "123"
         deserializeFromString(serializerA, '{"b":{"foo":"456"},"bar":"123"}').b.foo == "456"
+    }
+
+    void "lists"() {
+        given:
+        def compiled = buildClassLoader('example.Test', '''
+package example;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
+
+@JsonIgnoreProperties
+class Test {
+    List<String> list;
+}
+''')
+
+
+        def constructor = compiled.loadClass("example.Test").getDeclaredConstructor()
+        constructor.accessible = true
+        def test = constructor.newInstance()
+
+        test.list = ['foo', 'bar']
+
+        def serializer = (Serializer<?>) compiled.loadClass('example.Test$Serializer').getField("INSTANCE").get(null)
+
+        expect:
+        serializeToString(serializer, test) == '{"list":["foo","bar"]}'
+        deserializeFromString(serializer, '{"list":["foo","bar"]}').list == ['foo', 'bar']
     }
 }
