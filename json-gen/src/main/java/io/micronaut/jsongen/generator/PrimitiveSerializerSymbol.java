@@ -15,9 +15,9 @@ class PrimitiveSerializerSymbol implements SerializerSymbol {
     @Override
     public CodeBlock serialize(ClassElement type, CodeBlock readExpression) {
         if (type.equals(PrimitiveElement.BOOLEAN)) {
-            return CodeBlock.of(ENCODER + ".writeBoolean(" + readExpression + ");\n");
+            return CodeBlock.of("$N.writeBoolean($L);\n", ENCODER, readExpression);
         } else {
-            return CodeBlock.of(ENCODER + ".writeNumber(" + readExpression + ");\n");
+            return CodeBlock.of("$N.writeNumber($L);\n", ENCODER, readExpression);
         }
     }
 

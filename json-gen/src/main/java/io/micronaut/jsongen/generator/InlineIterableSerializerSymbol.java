@@ -32,7 +32,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         SerializerSymbol elementSerializer = linker.findSymbolForSerialize(elementType);
         return CodeBlock.builder()
                 .addStatement("$N.writeStartArray();", ENCODER)
-                .beginControlFlow("for ($T item : " + readExpression + ")", PoetUtil.toTypeName(elementType))
+                .beginControlFlow("for ($T item : $L)", PoetUtil.toTypeName(elementType), readExpression)
                 .add(elementSerializer.serialize(elementType, CodeBlock.of("item")))
                 .endControlFlow()
                 .addStatement("$N.writeEndArray();", ENCODER)
@@ -52,7 +52,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         DeserializationCode elementDeserCode = elementDeserializer.deserialize(elementType);
         block.add(elementDeserCode.getStatements());
         // todo: name collision on nested lists?
-        block.addStatement("$N.add(" + elementDeserCode.getResultExpression() + ")", INTERMEDIATE);
+        block.addStatement("$N.add($L)", INTERMEDIATE, elementDeserCode.getResultExpression());
 
         block.endControlFlow();
         return new DeserializationCode(

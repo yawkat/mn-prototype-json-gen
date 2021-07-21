@@ -8,7 +8,7 @@ class StringSerializerSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(String.class, StringSerializerSymbol.INSTANCE)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser('"foo"')) == 'foo'
+        deserializeFromString(serializer, '"foo"') == 'foo'
         serializeToString(serializer, 'foo') == '"foo"'
     }
 }

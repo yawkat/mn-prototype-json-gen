@@ -21,7 +21,7 @@ class Test {
     }
 }
 ''')
-        def deserialized = compiled.serializer.deserialize(new JsonFactory().createParser('{"a": "foo", "b": "bar"}'))
+        def deserialized = deserializeFromString(compiled.serializer, '{"a": "foo", "b": "bar"}')
         def testBean = compiled.newInstance()
         testBean.a = "foo"
         testBean.b = "bar"

@@ -14,7 +14,7 @@ class InlineIterableSerializerSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(String[].class, new SerializerLinker().array)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser('["foo", "bar"]')) == new String[] {'foo', 'bar'}
+        deserializeFromString(serializer, '["foo", "bar"]') == new String[] {'foo', 'bar'}
         serializeToString(serializer, new String[] {'foo', 'bar'}) == '["foo","bar"]'
     }
 
@@ -26,7 +26,7 @@ class InlineIterableSerializerSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(listType, new SerializerLinker().arrayList, listElement)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser('["foo", "bar"]')) == ['foo', 'bar']
+        deserializeFromString(serializer, '["foo", "bar"]') == ['foo', 'bar']
         serializeToString(serializer, ['foo', 'bar']) == '["foo","bar"]'
     }
 }

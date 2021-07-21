@@ -35,12 +35,12 @@ public class SerializerLinker {
 
             @Override
             public CodeBlock serialize(ClassElement type, CodeBlock readExpression) {
-                return CodeBlock.of("$T.INSTANCE.serialize($N, " + readExpression + ");\n", serializerClassName, Names.ENCODER);
+                return CodeBlock.of("$T.INSTANCE.serialize($N, $L);\n", serializerClassName, Names.ENCODER, readExpression);
             }
 
             @Override
             public DeserializationCode deserialize(ClassElement type) {
-                return new DeserializationCode(CodeBlock.of("$T.INSTANCE.deserialize($N)", Names.DECODER));
+                return new DeserializationCode(CodeBlock.of("$T.INSTANCE.deserialize($N)", serializerClassName, Names.DECODER));
             }
         };
     }

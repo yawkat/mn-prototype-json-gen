@@ -36,7 +36,6 @@ class AbstractSymbolSpec extends AbstractTypeElementSpec implements SerializerUt
                         .addException(IOException.class)
                         .returns(type)
                         .addCode(CodeBlock.builder()
-                                .addStatement('$N.nextToken()', Names.DECODER)
                                 .add(deserCode.statements)
                                 .addStatement("return " + deserCode.resultExpression)
                                 .build())

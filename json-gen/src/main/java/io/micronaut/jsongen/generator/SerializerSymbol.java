@@ -1,5 +1,6 @@
 package io.micronaut.jsongen.generator;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
 
@@ -13,6 +14,9 @@ public interface SerializerSymbol {
 
     /**
      * Generate code that reads a value from {@link Names#DECODER}.
+     * <p>
+     * Decoder should be positioned at the first token of the value (as specified by
+     * {@link io.micronaut.jsongen.Serializer#deserialize})
      */
     DeserializationCode deserialize(ClassElement type);
 

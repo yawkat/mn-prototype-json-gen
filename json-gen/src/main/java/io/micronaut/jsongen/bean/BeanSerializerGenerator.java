@@ -7,6 +7,7 @@ import com.squareup.javapoet.*;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.jsongen.JsonParseException;
 import io.micronaut.jsongen.Serializer;
 import io.micronaut.jsongen.generator.PoetUtil;
 import io.micronaut.jsongen.generator.SerializerLinker;
@@ -101,36 +102,37 @@ public class BeanSerializerGenerator {
     private CodeBlock generateSerialize() {
         CodeBlock.Builder serialize = CodeBlock.builder();
         // passing the value to writeStartObject helps with debugging, but will not affect functionality
-        serialize.addStatement(ENCODER + ".writeStartObject(" + VALUE + ")");
+        serialize.addStatement("$N.writeStartObject($N)", ENCODER, VALUE);
         for (BeanDefinition.Property prop : definition.props.values()) {
-            serialize.addStatement(ENCODER + ".writeFieldName($S)", prop.name);
+            serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
             serialize.addStatement(serializeBeanProperty(prop));
         }
-        serialize.addStatement(ENCODER + ".writeEndObject()");
+        serialize.addStatement("$N.writeEndObject()", ENCODER);
         return serialize.build();
     }
 
     private CodeBlock serializeBeanProperty(BeanDefinition.Property property) {
         ClassElement type;
-        String readExpression;
+        CodeBlock readExpression;
         if (property.getter != null) {
             type = property.getter.getGenericReturnType();
-            readExpression = VALUE + "." + property.getter.getName() + "()";
+            readExpression = CodeBlock.of("$N.$N()", VALUE, property.getter.getName());
         } else if (property.isGetter != null) {
             type = property.isGetter.getGenericReturnType();
-            readExpression = VALUE + "." + property.isGetter.getName() + "()";
+            readExpression = CodeBlock.of("$N.$N()", VALUE, property.isGetter.getName());
         } else if (property.field != null) {
             type = property.field.getGenericType();
-            readExpression = VALUE + "." + property.field.getName();
+            readExpression = CodeBlock.of("$N.$N", VALUE, property.field.getName());
         } else {
             throw new UnsupportedOperationException(); // TODO
         }
-        return linker.findSymbolForSerialize(type).serialize(type, CodeBlock.of(readExpression));
+        return linker.findSymbolForSerialize(type).serialize(type, readExpression);
     }
 
     private CodeBlock generateDeserialize() {
         CodeBlock.Builder deserialize = CodeBlock.builder();
-        deserialize.add("if ($N.nextToken() != $T.START_OBJECT) throw new $T();\n", DECODER, JsonToken.class, IOException.class); // todo: error msg
+        deserialize.add("if ($N.getCurrentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
+                DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
 
         // types used for deserialization
         Map<BeanDefinition.Property, ClassElement> deserializeTypes = definition.props.values().stream().collect(Collectors.toMap(prop -> prop, prop -> {
@@ -144,14 +146,15 @@ public class BeanSerializerGenerator {
         }));
         // create a local variable for each property
         for (BeanDefinition.Property prop : definition.props.values()) {
-            deserialize.addStatement("$T $N = " + getDefaultValueExpression(deserializeTypes.get(prop)), PoetUtil.toTypeName(deserializeTypes.get(prop)), sanitizedPropertyNames.get(prop.name));
+            deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(deserializeTypes.get(prop)), sanitizedPropertyNames.get(prop.name), getDefaultValueExpression(deserializeTypes.get(prop)));
         }
 
         // main parse loop
         deserialize.beginControlFlow("while (true)");
         deserialize.addStatement("$T token = $N.nextToken()", JsonToken.class, DECODER);
         deserialize.add("if (token == $T.END_OBJECT) break;\n", JsonToken.class);
-        deserialize.add("if (token != $T.FIELD_NAME) throw new $T();\n", JsonToken.class, IOException.class); // todo: error msg
+        deserialize.add("if (token != $T.FIELD_NAME) throw $T.from($N, \"Unexpected token \" + token + \", expected END_OBJECT or FIELD_NAME\");\n",
+                JsonToken.class, JsonParseException.class, DECODER);
         deserialize.addStatement("String fieldName = $N.getCurrentName()", DECODER);
         deserialize.addStatement("$N.nextToken()", DECODER);
         deserialize.beginControlFlow("switch (fieldName)", DECODER);
@@ -161,7 +164,7 @@ public class BeanSerializerGenerator {
             ClassElement propType = deserializeTypes.get(prop);
             SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType).deserialize(propType);
             deserialize.add(deserializationCode.getStatements());
-            deserialize.addStatement("$N = " + deserializationCode.getResultExpression(), sanitizedPropertyNames.get(prop.name));
+            deserialize.addStatement("$N = $L", sanitizedPropertyNames.get(prop.name), deserializationCode.getResultExpression());
             deserialize.addStatement("break");
             deserialize.endControlFlow();
         }

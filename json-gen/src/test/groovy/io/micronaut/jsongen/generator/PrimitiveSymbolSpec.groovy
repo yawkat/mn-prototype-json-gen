@@ -11,8 +11,8 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Boolean.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.BOOLEAN)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("true")) == true
-        serializer.deserialize(new JsonFactory().createParser("false")) == false
+        deserializeFromString(serializer, "true") == true
+        deserializeFromString(serializer, "false") == false
         serializeToString(serializer, true) == "true"
         serializeToString(serializer, false) == "false"
     }
@@ -22,8 +22,8 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Byte.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.BYTE)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("5")) == (byte) 5
-        serializer.deserialize(new JsonFactory().createParser("-4")) == (byte) -4
+        deserializeFromString(serializer, "5") == (byte) 5
+        deserializeFromString(serializer, "-4") == (byte) -4
         serializeToString(serializer, (byte) 5) == "5"
         serializeToString(serializer, (byte) -4) == "-4"
     }
@@ -33,8 +33,8 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Short.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.SHORT)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("512")) == (short) 512
-        serializer.deserialize(new JsonFactory().createParser("-4674")) == (short) -4674
+        deserializeFromString(serializer, "512") == (short) 512
+        deserializeFromString(serializer, "-4674") == (short) -4674
         serializeToString(serializer, (short) 512) == "512"
         serializeToString(serializer, (short) -4674) == "-4674"
     }
@@ -44,7 +44,7 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Character.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.CHAR)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("512")) == (char) 512
+        deserializeFromString(serializer, "512") == (char) 512
         serializeToString(serializer, (char) 512) == "512"
     }
 
@@ -53,8 +53,8 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Integer.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.INT)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("1874651")) == 1874651
-        serializer.deserialize(new JsonFactory().createParser("-1874651")) == -1874651
+        deserializeFromString(serializer, "1874651") == 1874651
+        deserializeFromString(serializer, "-1874651") == -1874651
         serializeToString(serializer, 1874651) == "1874651"
         serializeToString(serializer, -1874651) == "-1874651"
     }
@@ -64,8 +64,8 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Long.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.LONG)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("187465149261113196")) == 187465149261113196L
-        serializer.deserialize(new JsonFactory().createParser("-187465149261113196")) == -187465149261113196
+        deserializeFromString(serializer, "187465149261113196") == 187465149261113196L
+        deserializeFromString(serializer, "-187465149261113196") == -187465149261113196
         serializeToString(serializer, 187465149261113196) == "187465149261113196"
         serializeToString(serializer, -187465149261113196) == "-187465149261113196"
     }
@@ -75,7 +75,7 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Float.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.FLOAT)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("4.5")) == 4.5F
+        deserializeFromString(serializer, "4.5") == 4.5F
         serializeToString(serializer, 4.5F) == "4.5"
     }
 
@@ -84,7 +84,7 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         def serializer = buildBasicSerializer(Double.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.DOUBLE)
 
         expect:
-        serializer.deserialize(new JsonFactory().createParser("4.5")) == 4.5D
+        deserializeFromString(serializer, "4.5") == 4.5D
         serializeToString(serializer, 4.5D) == "4.5"
     }
 }
