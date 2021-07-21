@@ -31,7 +31,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
-        BeanDefinition definition = BeanIntrospector.introspect(type);
+        BeanDefinition definition = BeanIntrospector.introspect(type, true);
 
         String objectVarName = generatorContext.newLocalVariable("object");
 
@@ -39,16 +39,13 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         serialize.addStatement("$T $N = $L", PoetUtil.toTypeName(type), objectVarName, readExpression);
         // passing the value to writeStartObject helps with debugging, but will not affect functionality
         serialize.addStatement("$N.writeStartObject($N)", ENCODER, objectVarName);
-        for (BeanDefinition.Property prop : definition.props.values()) {
+        for (BeanDefinition.Property prop : definition.props) {
             serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
             ClassElement propType;
             CodeBlock propRead;
             if (prop.getter != null) {
                 propType = prop.getter.getGenericReturnType();
                 propRead = CodeBlock.of("$N.$N()", objectVarName, prop.getter.getName());
-            } else if (prop.isGetter != null) {
-                propType = prop.isGetter.getGenericReturnType();
-                propRead = CodeBlock.of("$N.$N()", objectVarName, prop.isGetter.getName());
             } else if (prop.field != null) {
                 propType = prop.field.getGenericType();
                 propRead = CodeBlock.of("$N.$N", objectVarName, prop.field.getName());
@@ -63,14 +60,14 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
-        BeanDefinition definition = BeanIntrospector.introspect(type);
+        BeanDefinition definition = BeanIntrospector.introspect(type, false);
 
         CodeBlock.Builder deserialize = CodeBlock.builder();
         deserialize.add("if ($N.getCurrentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
                 DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
 
         // types used for deserialization
-        Map<BeanDefinition.Property, ClassElement> deserializeTypes = definition.props.values().stream().collect(Collectors.toMap(prop -> prop, prop -> {
+        Map<BeanDefinition.Property, ClassElement> deserializeTypes = definition.props.stream().collect(Collectors.toMap(prop -> prop, prop -> {
             if (prop.setter != null) {
                 return prop.setter.getParameters()[0].getGenericType(); // TODO: bounds checks
             } else if (prop.field != null) {
@@ -79,11 +76,11 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 throw new UnsupportedOperationException(); // TODO: we can still generate serializer code
             }
         }));
-        Map<BeanDefinition.Property, String> localVariableNames = definition.props.values().stream()
+        Map<BeanDefinition.Property, String> localVariableNames = definition.props.stream()
                 .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
 
         // create a local variable for each property
-        for (BeanDefinition.Property prop : definition.props.values()) {
+        for (BeanDefinition.Property prop : definition.props) {
             deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(deserializeTypes.get(prop)), localVariableNames.get(prop), getDefaultValueExpression(deserializeTypes.get(prop)));
         }
 
@@ -98,7 +95,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         deserialize.addStatement("$T $N = $N.getCurrentName()", String.class, fieldNameVariable, DECODER);
         deserialize.addStatement("$N.nextToken()", DECODER);
         deserialize.beginControlFlow("switch ($N)", fieldNameVariable);
-        for (BeanDefinition.Property prop : definition.props.values()) {
+        for (BeanDefinition.Property prop : definition.props) {
             deserialize.beginControlFlow("case $S:", prop.name);
             // TODO: check for duplicate field
             ClassElement propType = deserializeTypes.get(prop);
@@ -126,7 +123,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         } else {
             throw new UnsupportedOperationException("Creator must be static method or constructor");
         }
-        for (BeanDefinition.Property prop : definition.props.values()) {
+        for (BeanDefinition.Property prop : definition.props) {
             String localVariable = localVariableNames.get(prop);
             if (prop.setter != null) {
                 deserialize.addStatement("$N.$N($N)", resultVariable, prop.setter.getName(), localVariable);

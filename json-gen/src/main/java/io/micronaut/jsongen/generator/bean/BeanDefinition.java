@@ -4,13 +4,11 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 
 class BeanDefinition {
-    final Map<String, Property> props = new LinkedHashMap<>();
-
     MethodElement defaultConstructor;
+    List<Property> props;
 
     static class Property {
         final String name;
@@ -21,8 +19,6 @@ class BeanDefinition {
         MethodElement getter = null;
         @Nullable
         MethodElement setter = null;
-        @Nullable
-        MethodElement isGetter = null;
 
         Property(String name) {
             this.name = name;
