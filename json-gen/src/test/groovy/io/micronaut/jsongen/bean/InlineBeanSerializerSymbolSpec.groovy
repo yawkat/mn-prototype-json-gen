@@ -1,5 +1,7 @@
 package io.micronaut.jsongen.bean
 
+import io.micronaut.jsongen.JsonParseException
+
 class InlineBeanSerializerSymbolSpec extends AbstractBeanSerializerSpec {
     void "simple bean"() {
         given:
@@ -210,5 +212,76 @@ class Test {
         expect:
         deserialized.bar == "42"
         serialized == '{}'
+    }
+
+    @SuppressWarnings('JsonDuplicatePropertyKeys')
+    void "duplicate property throws exception"() {
+        given:
+        def compiled = buildSerializer('''
+class Test {
+    String foo;
+}
+''')
+
+        when:
+        deserializeFromString(compiled.serializer, '{"foo": "42", "foo": "43"}')
+
+        then:
+        thrown JsonParseException
+    }
+
+    @SuppressWarnings('JsonDuplicatePropertyKeys')
+    void "missing required property throws exception"() {
+        given:
+        def compiled = buildSerializer('''
+import com.fasterxml.jackson.annotation.*;
+class Test {
+    String foo;
+    
+    @JsonCreator
+    Test(@JsonProperty(value = "foo", required = true) String foo) {
+        this.foo = foo;
+    }
+}
+''')
+
+        when:
+        deserializeFromString(compiled.serializer, '{}')
+
+        then:
+        thrown JsonParseException
+    }
+
+    void "missing required property throws exception, many variables"() {
+        given:
+        def compiled = buildSerializer('''
+import com.fasterxml.jackson.annotation.*;
+class Test {
+    String v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, 
+    v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, 
+    v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, v42, v43, v44, v45, v46, v47, 
+    v48, v49, v50, v51, v52, v53, v54, v55, v56, v57, v58, v59, v60, v61, v62, v63, 
+    v64, v65, v66, v67, v68, v69, v70, v71, v72, v73, v74, v75, v76, v77, v78, v79;
+
+    @JsonCreator
+    public Test(
+            @JsonProperty(value = "v7", required = true) String v7,
+            @JsonProperty(value = "v14", required = true) String v14,
+            @JsonProperty(value = "v75", required = true) String v75
+    ) {
+        this.v7 = v7;
+        this.v14 = v14;
+        this.v75 = v75;
+    }
+}
+''')
+
+        when:
+        deserializeFromString(compiled.serializer, '{"v7": "42", "v75": "43"}')
+
+        then:
+        def e = thrown JsonParseException
+        // with the right message please
+        e.message.contains("v14")
     }
 }

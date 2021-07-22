@@ -26,7 +26,7 @@ import io.micronaut.jsongen.generator.PoetUtil;
 import io.micronaut.jsongen.generator.SerializerLinker;
 import io.micronaut.jsongen.generator.SerializerSymbol;
 
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
@@ -75,104 +75,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
-        BeanDefinition definition = BeanIntrospector.introspect(type, false);
-
-        CodeBlock.Builder deserialize = CodeBlock.builder();
-        deserialize.add("if ($N.getCurrentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
-                DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
-
-        // types used for deserialization
-        Map<BeanDefinition.Property, ClassElement> deserializeTypes = definition.props.stream().collect(Collectors.toMap(prop -> prop, prop -> {
-            if (prop.setter != null) {
-                return prop.setter.getParameters()[0].getGenericType(); // TODO: bounds checks
-            } else if (prop.field != null) {
-                return prop.field.getGenericType();
-            } else if (prop.creatorParameter != null) {
-                return prop.creatorParameter.getGenericType();
-            } else {
-                throw new AssertionError("Cannot determine type, this property should have been filtered out during introspection");
-            }
-        }));
-        Map<BeanDefinition.Property, String> localVariableNames = definition.props.stream()
-                .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
-
-        // create a local variable for each property
-        for (BeanDefinition.Property prop : definition.props) {
-            deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(deserializeTypes.get(prop)), localVariableNames.get(prop), getDefaultValueExpression(deserializeTypes.get(prop)));
-        }
-
-        // main parse loop
-        deserialize.beginControlFlow("while (true)");
-        String tokenVariable = generatorContext.newLocalVariable("token");
-        deserialize.addStatement("$T $N = $N.nextToken()", JsonToken.class, tokenVariable, DECODER);
-        deserialize.add("if ($N == $T.END_OBJECT) break;\n", tokenVariable, JsonToken.class);
-        deserialize.add("if ($N != $T.FIELD_NAME) throw $T.from($N, \"Unexpected token \" + token + \", expected END_OBJECT or FIELD_NAME\");\n",
-                tokenVariable, JsonToken.class, JsonParseException.class, DECODER);
-        String fieldNameVariable = generatorContext.newLocalVariable("fieldName");
-        deserialize.addStatement("$T $N = $N.getCurrentName()", String.class, fieldNameVariable, DECODER);
-        deserialize.addStatement("$N.nextToken()", DECODER);
-        deserialize.beginControlFlow("switch ($N)", fieldNameVariable);
-        for (BeanDefinition.Property prop : definition.props) {
-            deserialize.beginControlFlow("case $S:", prop.name);
-            // TODO: check for duplicate field
-            ClassElement propType = deserializeTypes.get(prop);
-            SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType).deserialize(generatorContext, propType);
-            deserialize.add(deserializationCode.getStatements());
-            deserialize.addStatement("$N = $L", localVariableNames.get(prop), deserializationCode.getResultExpression());
-            deserialize.addStatement("break");
-            deserialize.endControlFlow();
-        }
-        deserialize.endControlFlow();
-        deserialize.endControlFlow();
-
-        // todo: check for missing fields
-        // todo: check for unknown fields
-
-        // assemble the result object
-
-        String resultVariable = generatorContext.newLocalVariable("result");
-
-        CodeBlock.Builder creatorParameters = CodeBlock.builder();
-        boolean firstParameter = true;
-        for (BeanDefinition.Property prop : definition.creatorProps) {
-            if (!firstParameter) {
-                creatorParameters.add(", ");
-            }
-            creatorParameters.add("$L", localVariableNames.get(prop));
-            firstParameter = false;
-        }
-
-        if (definition.creator instanceof ConstructorElement) {
-            deserialize.addStatement("$T $N = new $T($L)", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(type), creatorParameters.build());
-        } else if (definition.creator.isStatic()) {
-            // TODO edge cases?
-            deserialize.addStatement(
-                    "$T $N = $T.$N($L)",
-                    PoetUtil.toTypeName(type),
-                    resultVariable,
-                    PoetUtil.toTypeName(definition.creator.getDeclaringType()),
-                    definition.creator.getName(),
-                    creatorParameters.build()
-            );
-        } else {
-            throw new AssertionError("bad creator, should have been detected in BeanIntrospector");
-        }
-        for (BeanDefinition.Property prop : definition.props) {
-            String localVariable = localVariableNames.get(prop);
-            if (prop.setter != null) {
-                deserialize.addStatement("$N.$N($N)", resultVariable, prop.setter.getName(), localVariable);
-            } else if (prop.field != null) {
-                deserialize.addStatement("$N.$N = $N", resultVariable, prop.field.getName(), localVariable);
-            } else {
-                if (prop.creatorParameter == null) {
-                    throw new AssertionError("Cannot set property, should have been filtered out during introspection");
-                }
-            }
-        }
-        return new DeserializationCode(
-                deserialize.build(),
-                CodeBlock.of("$N", resultVariable)
-        );
+        return new DeserGen(generatorContext, type).generate();
     }
 
     private static String getDefaultValueExpression(ClassElement clazz) {
@@ -189,4 +92,265 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         }
     }
 
+    private class DeserGen {
+        private final GeneratorContext generatorContext;
+        private final ClassElement type;
+
+        private final BeanDefinition definition;
+        /**
+         * Types of all properties to deserialize
+         */
+        private final Map<BeanDefinition.Property, ClassElement> deserializeTypes;
+        /**
+         * Names of the local variables properties are saved in
+         */
+        private final Map<BeanDefinition.Property, String> localVariableNames;
+
+        private final DuplicatePropertyManager duplicatePropertyManager;
+
+        /**
+         * Main deser code
+         */
+        private final CodeBlock.Builder deserialize = CodeBlock.builder();
+
+        DeserGen(GeneratorContext generatorContext, ClassElement type) {
+            this.generatorContext = generatorContext;
+            this.type = type;
+
+            definition = BeanIntrospector.introspect(type, false);
+            deserializeTypes = definition.props.stream().collect(Collectors.toMap(prop -> prop, prop -> {
+                if (prop.setter != null) {
+                    return prop.setter.getParameters()[0].getGenericType(); // TODO: bounds checks
+                } else if (prop.field != null) {
+                    return prop.field.getGenericType();
+                } else if (prop.creatorParameter != null) {
+                    return prop.creatorParameter.getGenericType();
+                } else {
+                    throw new AssertionError("Cannot determine type, this property should have been filtered out during introspection");
+                }
+            }));
+            localVariableNames = definition.props.stream()
+                    .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
+            duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, definition.props);
+        }
+
+        private DeserializationCode generate() {
+            deserialize.add("if ($N.getCurrentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
+                    DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
+
+            duplicatePropertyManager.emitMaskDeclarations(deserialize);
+
+            // create a local variable for each property
+            for (BeanDefinition.Property prop : definition.props) {
+                deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(deserializeTypes.get(prop)), localVariableNames.get(prop), getDefaultValueExpression(deserializeTypes.get(prop)));
+            }
+
+            // main parse loop
+            deserialize.beginControlFlow("while (true)");
+            String tokenVariable = generatorContext.newLocalVariable("token");
+            deserialize.addStatement("$T $N = $N.nextToken()", JsonToken.class, tokenVariable, DECODER);
+            deserialize.add("if ($N == $T.END_OBJECT) break;\n", tokenVariable, JsonToken.class);
+            deserialize.add("if ($N != $T.FIELD_NAME) throw $T.from($N, \"Unexpected token \" + token + \", expected END_OBJECT or FIELD_NAME\");\n",
+                    tokenVariable, JsonToken.class, JsonParseException.class, DECODER);
+            String fieldNameVariable = generatorContext.newLocalVariable("fieldName");
+            deserialize.addStatement("$T $N = $N.getCurrentName()", String.class, fieldNameVariable, DECODER);
+            deserialize.addStatement("$N.nextToken()", DECODER);
+            deserialize.beginControlFlow("switch ($N)", fieldNameVariable);
+            for (BeanDefinition.Property prop : definition.props) {
+                deserialize.beginControlFlow("case $S:", prop.name);
+                deserializeProperty(prop);
+                deserialize.addStatement("break");
+                deserialize.endControlFlow();
+            }
+            deserialize.endControlFlow();
+            deserialize.endControlFlow();
+
+            duplicatePropertyManager.emitCheckRequired(deserialize);
+
+            // todo: check for unknown fields
+
+            // assemble the result object
+
+            String resultVariable = combineLocalsToResultVariable();
+            return new DeserializationCode(
+                    deserialize.build(),
+                    CodeBlock.of("$N", resultVariable)
+            );
+        }
+
+        private void deserializeProperty(BeanDefinition.Property prop) {
+            duplicatePropertyManager.emitReadVariable(deserialize, prop);
+
+            ClassElement propType = deserializeTypes.get(prop);
+            SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType).deserialize(generatorContext, propType);
+            deserialize.add(deserializationCode.getStatements());
+            deserialize.addStatement("$N = $L", localVariableNames.get(prop), deserializationCode.getResultExpression());
+        }
+
+        /**
+         * Combine all the local variables into the final result variable
+         *
+         * @return the result variable name
+         */
+        private String combineLocalsToResultVariable() {
+            String resultVariable = generatorContext.newLocalVariable("result");
+
+            CodeBlock.Builder creatorParameters = CodeBlock.builder();
+            boolean firstParameter = true;
+            for (BeanDefinition.Property prop : definition.creatorProps) {
+                if (!firstParameter) {
+                    creatorParameters.add(", ");
+                }
+                creatorParameters.add("$L", localVariableNames.get(prop));
+                firstParameter = false;
+            }
+
+            if (definition.creator instanceof ConstructorElement) {
+                deserialize.addStatement("$T $N = new $T($L)", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(type), creatorParameters.build());
+            } else if (definition.creator.isStatic()) {
+                // TODO edge cases?
+                deserialize.addStatement(
+                        "$T $N = $T.$N($L)",
+                        PoetUtil.toTypeName(type),
+                        resultVariable,
+                        PoetUtil.toTypeName(definition.creator.getDeclaringType()),
+                        definition.creator.getName(),
+                        creatorParameters.build()
+                );
+            } else {
+                throw new AssertionError("bad creator, should have been detected in BeanIntrospector");
+            }
+            for (BeanDefinition.Property prop : definition.props) {
+                String localVariable = localVariableNames.get(prop);
+                if (prop.setter != null) {
+                    deserialize.addStatement("$N.$N($N)", resultVariable, prop.setter.getName(), localVariable);
+                } else if (prop.field != null) {
+                    deserialize.addStatement("$N.$N = $N", resultVariable, prop.field.getName(), localVariable);
+                } else {
+                    if (prop.creatorParameter == null) {
+                        throw new AssertionError("Cannot set property, should have been filtered out during introspection");
+                    }
+                }
+            }
+            return resultVariable;
+        }
+    }
+
+    /**
+     * This class detects duplicate and missing properties using an inlined BitSet.
+     * <p>
+     * Note: implementation must use the same bit layout as BitSet to allow internal use of {@link BitSet#toLongArray()}.
+     */
+    private static class DuplicatePropertyManager {
+        private final List<BeanDefinition.Property> properties;
+
+        private final List<String> maskVariables;
+        private final Map<BeanDefinition.Property, Integer> offsets;
+
+        private final BitSet requiredMask;
+
+        DuplicatePropertyManager(
+                GeneratorContext context,
+                List<BeanDefinition.Property> properties
+        ) {
+            requiredMask = new BitSet(properties.size());
+            this.properties = properties;
+
+            offsets = new HashMap<>();
+            int offset = 0;
+            for (BeanDefinition.Property property : properties) {
+                offsets.put(property, offset);
+                // todo: only require when required=true is set
+                if (property.creatorParameter != null) {
+                    requiredMask.set(offset);
+                }
+
+                offset++;
+            }
+
+            // generate one mask for every 64 variables
+            maskVariables = new ArrayList<>();
+            for (int i = 0; i < offset; i += 64) {
+                maskVariables.add(context.newLocalVariable("mask"));
+            }
+        }
+
+        void emitMaskDeclarations(CodeBlock.Builder output) {
+            for (String maskVariable : maskVariables) {
+                output.addStatement("long $N = 0", maskVariable);
+            }
+        }
+
+        void emitReadVariable(CodeBlock.Builder output, BeanDefinition.Property prop) {
+            int offset = offsets.get(prop);
+            String maskVariable = maskVariable(offset);
+            String mask = mask(offset);
+            output.add(
+                    "if (($N & $L) != 0) throw $T.from($N, $S);\n",
+                    maskVariable,
+                    mask,
+                    JsonParseException.class,
+                    DECODER,
+                    "Duplicate property " + prop.name
+            );
+            output.addStatement("$N |= $L", maskVariable, mask);
+        }
+
+        private String maskVariable(int offset) {
+            return maskVariables.get(offset / 64);
+        }
+
+        private String mask(int offset) {
+            // shift does an implicit modulo
+            long value = 1L << offset;
+            return toHexLiteral(value);
+        }
+
+        private String toHexLiteral(long value) {
+            return "0x" + Long.toHexString(value) + "L";
+        }
+
+        void emitCheckRequired(CodeBlock.Builder output) {
+            if (requiredMask.isEmpty()) {
+                return;
+            }
+
+            // first, check whether there are any values missing, by simple mask comparison. This is the fast check.
+            long[] expected = requiredMask.toLongArray();
+            output.add("if (");
+            boolean first = true;
+            for (int i = 0; i < expected.length; i++) {
+                long value = expected[i];
+                if (value != 0) {
+                    if (!first) {
+                        output.add(" || ");
+                    }
+                    first = false;
+                    String valueLiteral = toHexLiteral(value);
+                    output.add("($N & $L) != $L", maskVariables.get(i), valueLiteral, valueLiteral);
+                }
+            }
+            output.add(") {\n").indent();
+
+            // if there are missing variables, determine which ones
+            int offset = 0;
+            for (BeanDefinition.Property prop : properties) {
+                if (requiredMask.get(offset)) {
+                    output.add(
+                            "if (($N & $L) == 0) throw $T.from($N, $S);\n",
+                            maskVariable(offset),
+                            mask(offset),
+                            JsonParseException.class,
+                            DECODER,
+                            "Missing property " + prop.name
+                    );
+                }
+                offset++;
+            }
+            output.add("// should never reach here, all possible missing properties are checked\n");
+            output.addStatement("throw new $T()", AssertionError.class);
+
+            output.endControlFlow();
+        }
+    }
 }
