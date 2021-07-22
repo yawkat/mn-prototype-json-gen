@@ -15,9 +15,11 @@
  */
 package io.micronaut.jsongen.generator;
 
+import com.fasterxml.jackson.core.JsonToken;
 import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.jsongen.JsonParseException;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
 import static io.micronaut.jsongen.generator.Names.ENCODER;
@@ -47,7 +49,38 @@ final class PrimitiveSerializerSymbol implements SerializerSymbol {
         if (!type.isPrimitive() || type.isArray()) {
             throw new UnsupportedOperationException("This symbol can only handle primitives");
         }
-        return new DeserializationCode(CodeBlock.of(deserializeExpression(type)));
+        return new DeserializationCode(
+                checkCorrectToken(generatorContext, type),
+                CodeBlock.of(deserializeExpression(type))
+        );
+    }
+
+    private CodeBlock checkCorrectToken(GeneratorContext generatorContext, ClassElement type) {
+        String tokenVar = generatorContext.newLocalVariable("token");
+        if (type.equals(PrimitiveElement.BOOLEAN)) {
+            return CodeBlock.builder()
+                    .addStatement("$T $N = $N.currentToken()", JsonToken.class, tokenVar, DECODER)
+                    .addStatement(
+                            "if ($N != $T.VALUE_TRUE && $N != $T.VALUE_FALSE) throw $T.from($N, $S + $N)",
+                            tokenVar, JsonToken.class,
+                            tokenVar, JsonToken.class,
+                            JsonParseException.class, DECODER,
+                            "Bad value for field " + generatorContext.getReadablePath() + ": Expected boolean, got ", tokenVar
+                    )
+                    .build();
+        } else {
+            // for numbers, we accept floats and ints interchangeably, because json makes no distinction. Other serialization formats might, though.
+            return CodeBlock.builder()
+                    .addStatement("$T $N = $N.currentToken()", JsonToken.class, tokenVar, DECODER)
+                    .addStatement(
+                            "if ($N != $T.VALUE_NUMBER_INT && $N != $T.VALUE_NUMBER_FLOAT) throw $T.from($N, $S + $N)",
+                            tokenVar, JsonToken.class,
+                            tokenVar, JsonToken.class,
+                            JsonParseException.class, DECODER,
+                            "Bad value for field " + generatorContext.getReadablePath() + ": Expected number, got ", tokenVar
+                    )
+                    .build();
+        }
     }
 
     private String deserializeExpression(ClassElement type) {

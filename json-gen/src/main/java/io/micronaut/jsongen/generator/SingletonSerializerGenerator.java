@@ -57,7 +57,7 @@ public final class SingletonSerializerGenerator {
             SerializerSymbol symbol,
             ClassElement valueType
     ) {
-        GeneratorContext deserContext = new GeneratorContext();
+        GeneratorContext deserContext = GeneratorContext.create(valueName.toString());
         deserContext.registerLocalVariable(DECODER);
         SerializerSymbol.DeserializationCode deserializationCode = symbol.deserialize(deserContext, valueType);
         MethodSpec deserialize = MethodSpec.methodBuilder("deserialize")
@@ -72,7 +72,7 @@ public final class SingletonSerializerGenerator {
                         .build())
                 .build();
 
-        GeneratorContext serContext = new GeneratorContext();
+        GeneratorContext serContext = GeneratorContext.create(valueName.toString());
         serContext.registerLocalVariable("value");
         serContext.registerLocalVariable(ENCODER);
         MethodSpec serialize = MethodSpec.methodBuilder("serialize")

@@ -65,9 +65,10 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 propType = prop.field.getGenericType();
                 propRead = CodeBlock.of("$N.$N", objectVarName, prop.field.getName());
             } else {
-                throw new UnsupportedOperationException(); // TODO
+                throw new AssertionError("No accessor, property should have been filtered");
             }
-            serialize.add(linker.findSymbolForSerialize(propType).serialize(generatorContext, propType, propRead));
+            serialize.add(linker.findSymbolForSerialize(propType)
+                    .serialize(generatorContext.withSubPath(prop.name), propType, propRead));
         }
         serialize.addStatement("$N.writeEndObject()", ENCODER);
         return serialize.build();
@@ -182,7 +183,8 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             duplicatePropertyManager.emitReadVariable(deserialize, prop);
 
             ClassElement propType = deserializeTypes.get(prop);
-            SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType).deserialize(generatorContext, propType);
+            SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType)
+                    .deserialize(generatorContext.withSubPath(prop.name), propType);
             deserialize.add(deserializationCode.getStatements());
             deserialize.addStatement("$N = $L", localVariableNames.get(prop), deserializationCode.getResultExpression());
         }

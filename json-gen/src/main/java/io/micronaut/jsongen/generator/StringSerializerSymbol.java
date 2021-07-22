@@ -15,8 +15,10 @@
  */
 package io.micronaut.jsongen.generator;
 
+import com.fasterxml.jackson.core.JsonToken;
 import com.squareup.javapoet.CodeBlock;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.jsongen.JsonParseException;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
 import static io.micronaut.jsongen.generator.Names.ENCODER;
@@ -40,6 +42,16 @@ final class StringSerializerSymbol implements SerializerSymbol {
 
     @Override
     public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
-        return new DeserializationCode(CodeBlock.of("$N.getText()", DECODER));
+        return new DeserializationCode(
+                CodeBlock.builder()
+                        .addStatement(
+                                "if ($N.currentToken() != $T.VALUE_STRING) throw $T.from($N, $S + $N.currentToken())",
+                                DECODER, JsonToken.class,
+                                JsonParseException.class, DECODER,
+                                "Bad value for field " + generatorContext.getReadablePath() + ": Expected string, got ", DECODER
+                        )
+                        .build(),
+                CodeBlock.of("$N.getText()", DECODER)
+        );
     }
 }

@@ -1,8 +1,8 @@
 package io.micronaut.jsongen.generator
 
-import com.fasterxml.jackson.core.JsonFactory
+
 import io.micronaut.inject.ast.PrimitiveElement
-import io.micronaut.jsongen.Serializer
+import io.micronaut.jsongen.JsonParseException
 
 class PrimitiveSymbolSpec extends AbstractSymbolSpec {
     @SuppressWarnings('GroovyPointlessBoolean')
@@ -86,5 +86,23 @@ class PrimitiveSymbolSpec extends AbstractSymbolSpec {
         expect:
         deserializeFromString(serializer, "4.5") == 4.5D
         serializeToString(serializer, 4.5D) == "4.5"
+    }
+
+    def "boolean wrong token error"() {
+        given:
+        def serializer = buildBasicSerializer(Boolean.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.BOOLEAN)
+        when:
+        deserializeFromString(serializer, "4")
+        then:
+        thrown JsonParseException
+    }
+
+    def "number wrong token error"() {
+        given:
+        def serializer = buildBasicSerializer(Integer.class, PrimitiveSerializerSymbol.INSTANCE, PrimitiveElement.INT)
+        when:
+        deserializeFromString(serializer, "true")
+        then:
+        thrown JsonParseException
     }
 }

@@ -47,7 +47,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         return CodeBlock.builder()
                 .addStatement("$N.writeStartArray()", ENCODER)
                 .beginControlFlow("for ($T item : $L)", PoetUtil.toTypeName(elementType), readExpression)
-                .add(elementSerializer.serialize(generatorContext, elementType, CodeBlock.of("item")))
+                .add(elementSerializer.serialize(generatorContext.withSubPath("[*]"), elementType, CodeBlock.of("item")))
                 .endControlFlow()
                 .addStatement("$N.writeEndArray()", ENCODER)
                 .build();

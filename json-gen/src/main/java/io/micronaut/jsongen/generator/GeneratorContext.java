@@ -19,9 +19,28 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class GeneratorContext {
-    private final Set<String> usedVariables = new HashSet<>();
+    /**
+     * A readable path to this context, used for better error messages.
+     */
+    private final String readablePath;
+    private final Set<String> usedVariables;
 
-    public GeneratorContext() {
+    private GeneratorContext(String readablePath, Set<String> usedVariables) {
+        this.readablePath = readablePath;
+        this.usedVariables = usedVariables;
+    }
+
+    public static GeneratorContext create(String rootReadablePath) {
+        return new GeneratorContext(rootReadablePath, new HashSet<>());
+    }
+
+    public String getReadablePath() {
+        return readablePath;
+    }
+
+    public GeneratorContext withSubPath(String element) {
+        // usedVariables is mutable, so we can just reuse it
+        return new GeneratorContext(readablePath + "->" + element, usedVariables);
     }
 
     /**

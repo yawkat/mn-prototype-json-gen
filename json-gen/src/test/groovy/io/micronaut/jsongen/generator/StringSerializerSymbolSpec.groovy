@@ -1,6 +1,7 @@
 package io.micronaut.jsongen.generator
 
-import com.fasterxml.jackson.core.JsonFactory
+
+import io.micronaut.jsongen.JsonParseException
 
 class StringSerializerSymbolSpec extends AbstractSymbolSpec {
     def "string"() {
@@ -10,5 +11,14 @@ class StringSerializerSymbolSpec extends AbstractSymbolSpec {
         expect:
         deserializeFromString(serializer, '"foo"') == 'foo'
         serializeToString(serializer, 'foo') == '"foo"'
+    }
+
+    def "wrong token throws error"() {
+        given:
+        def serializer = buildBasicSerializer(String.class, StringSerializerSymbol.INSTANCE)
+        when:
+        deserializeFromString(serializer, '52')
+        then:
+        thrown JsonParseException
     }
 }
