@@ -67,7 +67,6 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
 
         DeserializationCode elementDeserCode = elementDeserializer.deserialize(generatorContext, elementType);
         block.add(elementDeserCode.getStatements());
-        // todo: name collision on nested lists?
         block.addStatement("$N.add($L)", intermediateVariable, elementDeserCode.getResultExpression());
 
         block.endControlFlow();
@@ -78,7 +77,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     }
 
     protected CodeBlock createIntermediate(ClassElement elementType, String intermediateVariable) {
-        return CodeBlock.of("$T<$T> $N = new $T<>();", ArrayList.class, PoetUtil.toTypeName(elementType), intermediateVariable, ArrayList.class);
+        return CodeBlock.of("$T<$T> $N = new $T<>();\n", ArrayList.class, PoetUtil.toTypeName(elementType), intermediateVariable, ArrayList.class);
     }
 
     protected abstract CodeBlock finishDeserialize(ClassElement elementType, String intermediateVariable);

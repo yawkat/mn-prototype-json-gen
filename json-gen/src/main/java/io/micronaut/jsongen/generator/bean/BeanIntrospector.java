@@ -15,15 +15,15 @@
  */
 package io.micronaut.jsongen.generator.bean;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.*;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 class BeanIntrospector {
@@ -31,9 +31,11 @@ class BeanIntrospector {
         Scanner scanner = new Scanner(forSerialization);
         scanner.scan(clazz);
         BeanDefinition beanDefinition = new BeanDefinition();
-        beanDefinition.defaultConstructor = scanner.defaultConstructor;
-        beanDefinition.props = scanner.byImplicitName.values().stream()
-                .map(prop -> {
+        Map<Property, BeanDefinition.Property> completeProps = scanner.byName.values().stream().collect(Collectors.toMap(
+                prop -> prop,
+                prop -> {
+                    prop.trimInaccessible(forSerialization);
+
                     BeanDefinition.Property tgt = new BeanDefinition.Property(prop.name);
                     if (prop.getter != null) {
                         tgt.getter = prop.getter.accessor;
@@ -44,9 +46,29 @@ class BeanIntrospector {
                     if (prop.field != null) {
                         tgt.field = prop.field.accessor;
                     }
+                    if (prop.creatorParameter != null) {
+                        tgt.creatorParameter = prop.creatorParameter;
+                    }
                     return tgt;
-                })
+                }
+        ));
+        // filter out properties based on whether they're read/write-only
+        beanDefinition.props = completeProps.entrySet().stream()
+                .filter(e -> e.getKey().shouldInclude(forSerialization))
+                .map(Map.Entry::getValue)
                 .collect(Collectors.toList());
+        if (scanner.creator == null) {
+            if (scanner.defaultConstructor == null) {
+                throw new UnsupportedOperationException("Missing default constructor or @JsonCreator");
+            }
+
+            // use the default constructor as an "empty creator"
+            beanDefinition.creator = scanner.defaultConstructor;
+            beanDefinition.creatorProps = Collections.emptyList();
+        } else {
+            beanDefinition.creator = scanner.creator;
+            beanDefinition.creatorProps = scanner.creatorProps.stream().map(completeProps::get).collect(Collectors.toList());
+        }
         return beanDefinition;
     }
 
@@ -79,10 +101,14 @@ class BeanIntrospector {
      */
     private static class Scanner {
         final Map<String, Property> byImplicitName = new LinkedHashMap<>();
+        Map<String, Property> byName;
 
         MethodElement defaultConstructor;
 
         private final boolean forSerialization;
+
+        MethodElement creator = null;
+        List<Property> creatorProps;
 
         Scanner(boolean forSerialization) {
             this.forSerialization = forSerialization;
@@ -90,6 +116,14 @@ class BeanIntrospector {
 
         private Property getByImplicitName(String implicitName) {
             return byImplicitName.computeIfAbsent(implicitName, s -> new Property());
+        }
+
+        private Property getByName(String name) {
+            return byName.computeIfAbsent(name, s -> {
+                Property property = new Property();
+                property.name = s;
+                return property;
+            });
         }
 
         private String getExplicitName(AnnotatedElement element) {
@@ -130,8 +164,6 @@ class BeanIntrospector {
         }
 
         void scan(ClassElement clazz) {
-            clazz.getSuperType().ifPresent(this::scan);
-
             // todo: check we don't have another candidate when replacing properties of the definition
 
             // note: clazz may be a superclass of our original class. in that case, the defaultConstructor will be overwritten.
@@ -157,6 +189,7 @@ class BeanIntrospector {
                 if (method.getParameters().length == 0) {
                     // getter
                     String implicitName = null;
+                    // TODO: reuse bean method detection
                     if (rawName.startsWith("get") && rawName.length() > 3) {
                         implicitName = decapitalize(rawName.substring(3));
                     } else if (rawName.startsWith("is") && rawName.length() > 2) {
@@ -195,10 +228,71 @@ class BeanIntrospector {
                 }
             }
 
+            byName = new LinkedHashMap<>();
             for (Map.Entry<String, Property> entry : byImplicitName.entrySet()) {
                 Property prop = entry.getValue();
                 String explicitName = forSerialization ? firstExplicitName(prop.getter, prop.setter, prop.field) : firstExplicitName(prop.setter, prop.getter, prop.field);
                 prop.name = explicitName == null ? entry.getKey() : explicitName;
+                byName.put(prop.name, prop);
+            }
+
+            for (MethodElement method : clazz.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(m -> m.hasAnnotation(JsonCreator.class)))) {
+                handleCreator(method);
+            }
+            for (ConstructorElement constructor : clazz.getEnclosedElements(ElementQuery.of(ConstructorElement.class).annotated(m -> m.hasAnnotation(JsonCreator.class)))) {
+                handleCreator(constructor);
+            }
+        }
+
+        private void handleCreator(MethodElement method) {
+            AnnotationValue<JsonCreator> creatorAnnotation = method.getAnnotation(JsonCreator.class);
+            assert creatorAnnotation != null;
+            JsonCreator.Mode mode = creatorAnnotation.get("mode", JsonCreator.Mode.class).orElse(JsonCreator.Mode.DEFAULT);
+
+            ParameterElement[] parameters = method.getParameters();
+            boolean delegating;
+            switch (mode) {
+                case DEFAULT:
+                    delegating = parameters.length == 1 && parameters[0].getAnnotation(JsonProperty.class) == null;
+                    break;
+                case DELEGATING:
+                    delegating = true;
+                    break;
+                case PROPERTIES:
+                    delegating = false;
+                    break;
+                case DISABLED:
+                    return; // skip this creator
+                default:
+                    throw new AssertionError("bad creator mode " + mode);
+            }
+
+            // do this check after checking the mode so that DISABLED creators don't lead to an error
+            if (!method.isStatic() && !(method instanceof ConstructorElement)) {
+                throw new UnsupportedOperationException("@JsonCreator annotation cannot be placed on instance methods");
+            }
+
+            if (delegating) {
+                // todo
+                throw new UnsupportedOperationException("Delegating creator not yet supported");
+            } else {
+                if (creator != null) {
+                    throw new UnsupportedOperationException("Multiple creators configured");
+                }
+                creator = method;
+                creatorProps = new ArrayList<>();
+                for (ParameterElement parameter : parameters) {
+                    AnnotationValue<JsonProperty> propertyAnnotation = parameter.getAnnotation(JsonProperty.class);
+                    if (propertyAnnotation == null) {
+                        throw new UnsupportedOperationException("All parameters of a @JsonCreator must be annotated with a @JsonProperty");
+                    }
+                    String propName = propertyAnnotation.getValue(String.class)
+                            // we allow empty property names here, as long as they're explicitly defined.
+                            .orElseThrow(() -> new UnsupportedOperationException("@JsonProperty name cannot be missing on a creator"));
+                    Property prop = getByName(propName);
+                    prop.creatorParameter = parameter;
+                    creatorProps.add(prop);
+                }
             }
         }
     }
@@ -206,9 +300,36 @@ class BeanIntrospector {
     private static class Property {
         String name;
 
+        @Nullable
         Accessor<FieldElement> field;
+        @Nullable
         Accessor<MethodElement> getter;
+        @Nullable
         Accessor<MethodElement> setter;
+        @Nullable
+        ParameterElement creatorParameter;
+
+        void trimInaccessible(boolean forSerialization) {
+            if (getter != null && !getter.isAccessible()) {
+                getter = null;
+            }
+            if (setter != null && !setter.isAccessible()) {
+                setter = null;
+            }
+            if (field != null && (!field.isAccessible() || (!forSerialization && field.accessor.isFinal()))) {
+                field = null;
+            }
+        }
+
+        boolean shouldInclude(boolean forSerialization) {
+            // if the accessors weren't accessible, they were already removed in trimAccessible
+            // todo: error when a property is inaccessible because the user forgot to give access
+            if (forSerialization) {
+                return getter != null || field != null;
+            } else {
+                return setter != null || field != null || creatorParameter != null;
+            }
+        }
     }
 
     private static class Accessor<T extends Element> {
@@ -220,6 +341,11 @@ class BeanIntrospector {
             this.name = name;
             this.accessor = accessor;
             this.type = type;
+        }
+
+        boolean isAccessible() {
+            // serializers are always in the same package right now
+            return !accessor.isPrivate();
         }
     }
 

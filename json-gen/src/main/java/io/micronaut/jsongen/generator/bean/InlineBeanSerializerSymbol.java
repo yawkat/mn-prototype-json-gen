@@ -87,8 +87,10 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 return prop.setter.getParameters()[0].getGenericType(); // TODO: bounds checks
             } else if (prop.field != null) {
                 return prop.field.getGenericType();
+            } else if (prop.creatorParameter != null) {
+                return prop.creatorParameter.getGenericType();
             } else {
-                throw new UnsupportedOperationException(); // TODO: we can still generate serializer code
+                throw new AssertionError("Cannot determine type, this property should have been filtered out during introspection");
             }
         }));
         Map<BeanDefinition.Property, String> localVariableNames = definition.props.stream()
@@ -128,15 +130,32 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
         // assemble the result object
 
-        // todo: @JsonCreator
         String resultVariable = generatorContext.newLocalVariable("result");
-        if (definition.defaultConstructor instanceof ConstructorElement) {
-            deserialize.addStatement("$T $N = new $T()", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(type));
-        } else if (definition.defaultConstructor.isStatic()) {
+
+        CodeBlock.Builder creatorParameters = CodeBlock.builder();
+        boolean firstParameter = true;
+        for (BeanDefinition.Property prop : definition.creatorProps) {
+            if (!firstParameter) {
+                creatorParameters.add(", ");
+            }
+            creatorParameters.add("$L", localVariableNames.get(prop));
+            firstParameter = false;
+        }
+
+        if (definition.creator instanceof ConstructorElement) {
+            deserialize.addStatement("$T $N = new $T($L)", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(type), creatorParameters.build());
+        } else if (definition.creator.isStatic()) {
             // TODO edge cases?
-            deserialize.addStatement("$T $N = $T.$N()", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(definition.defaultConstructor.getDeclaringType()), definition.defaultConstructor.getName());
+            deserialize.addStatement(
+                    "$T $N = $T.$N($L)",
+                    PoetUtil.toTypeName(type),
+                    resultVariable,
+                    PoetUtil.toTypeName(definition.creator.getDeclaringType()),
+                    definition.creator.getName(),
+                    creatorParameters.build()
+            );
         } else {
-            throw new UnsupportedOperationException("Creator must be static method or constructor");
+            throw new AssertionError("bad creator, should have been detected in BeanIntrospector");
         }
         for (BeanDefinition.Property prop : definition.props) {
             String localVariable = localVariableNames.get(prop);
@@ -145,8 +164,9 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             } else if (prop.field != null) {
                 deserialize.addStatement("$N.$N = $N", resultVariable, prop.field.getName(), localVariable);
             } else {
-                // TODO: fail gracefully, can still serialize
-                throw new UnsupportedOperationException("Cannot set property " + prop.name);
+                if (prop.creatorParameter == null) {
+                    throw new AssertionError("Cannot set property, should have been filtered out during introspection");
+                }
             }
         }
         return new DeserializationCode(

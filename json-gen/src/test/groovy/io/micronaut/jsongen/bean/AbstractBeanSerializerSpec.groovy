@@ -54,6 +54,12 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
             constructor.accessible = true
             return constructor.newInstance()
         }
+
+        def newInstance(List<Class<?>> paramTypes, List<?> params) {
+            def constructor = beanClass.getDeclaredConstructor(paramTypes.toArray(Class[]::new))
+            constructor.accessible = true
+            return constructor.newInstance(params.toArray(Object[]::new))
+        }
     }
 
     /**

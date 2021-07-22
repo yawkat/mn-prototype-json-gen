@@ -102,6 +102,7 @@ public final class SingletonSerializerGenerator {
     }
 
     private static boolean isSameType(ClassElement a, ClassElement b) {
+        // todo: mn3 .equals
         if (!a.getName().equals(b.getName())) {
             return false;
         }

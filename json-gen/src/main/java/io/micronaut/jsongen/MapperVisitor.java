@@ -17,6 +17,7 @@ package io.micronaut.jsongen;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotation;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -33,6 +34,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public class MapperVisitor implements TypeElementVisitor<Object, Object> {
     private static final String ATTR_LINKER = "io.micronaut.SERIALIZER_LINKER";
@@ -40,9 +42,21 @@ public class MapperVisitor implements TypeElementVisitor<Object, Object> {
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (element.hasStereotype(JacksonAnnotation.class)) {
-            // triggers generation logic
+            // triggers generation logic todo
             getLinker(context).findSymbolGeneric(element);
         }
+    }
+
+    @Override
+    @NonNull
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationNames() {
+        // TODO, patterns
+        return TypeElementVisitor.super.getSupportedAnnotationNames();
     }
 
     @Override
@@ -52,6 +66,8 @@ public class MapperVisitor implements TypeElementVisitor<Object, Object> {
             return;
         }
 
+        // todo: gen serviceloader
+        // todo: support groovy/kt
         Filer filer = ((JavaVisitorContext) visitorContext).getProcessingEnv().getFiler();
         try {
             for (SingletonSerializerGenerator.GenerationResult generationResult : linker.outputQueue) {

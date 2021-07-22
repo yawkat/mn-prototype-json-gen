@@ -18,11 +18,14 @@ package io.micronaut.jsongen.generator.bean;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 
 import java.util.List;
 
 class BeanDefinition {
-    MethodElement defaultConstructor;
+    MethodElement creator;
+    List<Property> creatorProps;
+
     List<Property> props;
 
     static class Property {
@@ -34,6 +37,8 @@ class BeanDefinition {
         MethodElement getter = null;
         @Nullable
         MethodElement setter = null;
+        @Nullable
+        ParameterElement creatorParameter = null;
 
         Property(String name) {
             this.name = name;
