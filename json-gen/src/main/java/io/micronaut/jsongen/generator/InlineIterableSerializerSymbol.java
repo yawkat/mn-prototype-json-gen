@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.jsongen.generator;
 
 import com.fasterxml.jackson.core.JsonToken;
@@ -7,7 +22,6 @@ import io.micronaut.inject.ast.ClassElement;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
 import static io.micronaut.jsongen.generator.Names.ENCODER;
@@ -92,7 +106,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     }
 
     /**
-     * Can also do {@link Iterable} and {@link List}
+     * Can also do {@link Iterable} and {@link java.util.List}.
      */
     static class ArrayListImpl extends InlineIterableSerializerSymbol {
         ArrayListImpl(SerializerLinker linker) {
@@ -113,10 +127,18 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
             /* todo: bug in getTypeArguments(class)? only returns java.lang.Object
             return type.getTypeArguments(Iterable.class).get("T");
             */
-            if (type.getName().equals("java.util.ArrayList")) return type.getTypeArguments().get("E");
-            if (type.getName().equals("java.util.List")) return type.getTypeArguments().get("E");
-            if (type.getName().equals("java.util.Collection")) return type.getTypeArguments().get("E");
-            if (type.getName().equals("java.util.Iterable")) return type.getTypeArguments().get("T");
+            if (type.getName().equals("java.util.ArrayList")) {
+                return type.getTypeArguments().get("E");
+            }
+            if (type.getName().equals("java.util.List")) {
+                return type.getTypeArguments().get("E");
+            }
+            if (type.getName().equals("java.util.Collection")) {
+                return type.getTypeArguments().get("E");
+            }
+            if (type.getName().equals("java.util.Iterable")) {
+                return type.getTypeArguments().get("T");
+            }
 
             // raw type? todo
             throw new UnsupportedOperationException("raw type");

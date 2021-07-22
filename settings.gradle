@@ -1,4 +1,4 @@
 rootProject.name = 'prototype-json-gen'
 include 'json-gen'
-include 'json-gen-test'
+include 'test-module'
 

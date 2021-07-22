@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-$YEAR original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,3 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.jsongen.generator;
-
-import io.micronaut.core.annotation.Internal;
-
-@Internal
-public final class Names {
-    public static final String ENCODER = "encoder";
-    public static final String DECODER = "decoder";
-
-    private Names() {
-    }
-}

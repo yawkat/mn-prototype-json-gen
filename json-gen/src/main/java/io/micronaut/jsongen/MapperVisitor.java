@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.jsongen;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotation;
@@ -33,14 +48,16 @@ public class MapperVisitor implements TypeElementVisitor<Object, Object> {
     @Override
     public void finish(VisitorContext visitorContext) {
         GeneratingLinker linker = getLinker(visitorContext);
-        if (linker.outputQueue.isEmpty()) return;
+        if (linker.outputQueue.isEmpty()) {
+            return;
+        }
 
         Filer filer = ((JavaVisitorContext) visitorContext).getProcessingEnv().getFiler();
         try {
             for (SingletonSerializerGenerator.GenerationResult generationResult : linker.outputQueue) {
-                JavaFileObject sourceFile = filer.createSourceFile(generationResult.serializerClassName.reflectionName());
+                JavaFileObject sourceFile = filer.createSourceFile(generationResult.getSerializerClassName().reflectionName());
                 try (Writer writer = sourceFile.openWriter()) {
-                    generationResult.generatedFile.writeTo(writer);
+                    generationResult.getGeneratedFile().writeTo(writer);
                 }
             }
         } catch (IOException e) {
@@ -53,7 +70,9 @@ public class MapperVisitor implements TypeElementVisitor<Object, Object> {
 
     private GeneratingLinker getLinker(VisitorContext context) {
         Optional<GeneratingLinker> present = context.get(ATTR_LINKER, GeneratingLinker.class);
-        if (present.isPresent()) return present.get();
+        if (present.isPresent()) {
+            return present.get();
+        }
         GeneratingLinker linker = new GeneratingLinker();
         context.put(ATTR_LINKER, linker);
         return linker;

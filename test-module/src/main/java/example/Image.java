@@ -13,23 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.jsongen;
+package example;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import java.io.IOException;
+import java.util.List;
 
-public interface Serializer<T> {
-    /**
-     * Deserialize from the given {@code decoder}.
-     * <p>
-     * The decoder {@link JsonParser#getCurrentToken()} should be positioned at the first token of this value.
-     *
-     * @param decoder The decoder to parse from
-     * @return The decoded value
-     */
-    T deserialize(JsonParser decoder) throws IOException;
+@JsonIgnoreProperties
+public final class Image {
+    private int id;
+    private String uri;
+    private List<Tag> tags;
 
-    void serialize(JsonGenerator encoder, T value) throws IOException;
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getUri() {
+        return uri;
+    }
+
+    public void setUri(String uri) {
+        this.uri = uri;
+    }
+
+    public List<Tag> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<Tag> tags) {
+        this.tags = tags;
+    }
 }

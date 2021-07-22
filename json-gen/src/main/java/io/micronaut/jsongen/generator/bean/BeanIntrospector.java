@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.jsongen.generator.bean;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -20,24 +35,54 @@ class BeanIntrospector {
         beanDefinition.props = scanner.byImplicitName.values().stream()
                 .map(prop -> {
                     BeanDefinition.Property tgt = new BeanDefinition.Property(prop.name);
-                    if (prop.getter != null) tgt.getter = prop.getter.accessor;
-                    if (prop.setter != null) tgt.setter = prop.setter.accessor;
-                    if (prop.field != null) tgt.field = prop.field.accessor;
+                    if (prop.getter != null) {
+                        tgt.getter = prop.getter.accessor;
+                    }
+                    if (prop.setter != null) {
+                        tgt.setter = prop.setter.accessor;
+                    }
+                    if (prop.field != null) {
+                        tgt.field = prop.field.accessor;
+                    }
                     return tgt;
                 })
                 .collect(Collectors.toList());
         return beanDefinition;
     }
 
+    private static String firstExplicitName(Accessor<?>... accessors) {
+        for (Accessor<?> accessor : accessors) {
+            if (accessor != null && accessor.type == AccessorType.EXPLICIT) {
+                return accessor.name;
+            }
+        }
+        return null;
+    }
+
+    private static String decapitalize(String s) {
+        if (s.isEmpty()) {
+            return "";
+        }
+
+        char firstChar = s.charAt(0);
+        if (Character.isLowerCase(firstChar)) {
+            return s;
+        }
+
+        // todo: abbreviations at start of string
+
+        return Character.toLowerCase(firstChar) + s.substring(1);
+    }
+
     /**
-     * mostly follows jackson-jr AnnotationBasedIntrospector
+     * mostly follows jackson-jr AnnotationBasedIntrospector.
      */
     private static class Scanner {
-        private final boolean forSerialization;
+        final Map<String, Property> byImplicitName = new LinkedHashMap<>();
 
         MethodElement defaultConstructor;
 
-        final Map<String, Property> byImplicitName = new LinkedHashMap<>();
+        private final boolean forSerialization;
 
         Scanner(boolean forSerialization) {
             this.forSerialization = forSerialization;
@@ -60,7 +105,9 @@ class BeanIntrospector {
 
         private boolean isIgnore(AnnotatedElement element) {
             AnnotationValue<JsonIgnore> ignore = element.getAnnotation(JsonIgnore.class);
-            if (ignore == null) return false;
+            if (ignore == null) {
+                return false;
+            }
             Optional<Boolean> value = ignore.getValue(Boolean.class);
             return value.orElse(true);
         }
@@ -93,14 +140,18 @@ class BeanIntrospector {
             // TODO: ignore private members
 
             for (FieldElement field : clazz.getFields()) {
-                if (field.isStatic()) continue;
+                if (field.isStatic()) {
+                    continue;
+                }
 
                 Property prop = getByImplicitName(field.getName());
                 prop.field = makeAccessor(field, field.getName());
             }
 
             for (MethodElement method : clazz.getEnclosedElements(ElementQuery.ALL_METHODS)) {
-                if (method.isStatic()) continue;
+                if (method.isStatic()) {
+                    continue;
+                }
 
                 String rawName = method.getName();
                 if (method.getParameters().length == 0) {
@@ -152,15 +203,6 @@ class BeanIntrospector {
         }
     }
 
-    private static String firstExplicitName(Accessor<?>... accessors) {
-        for (Accessor<?> accessor : accessors) {
-            if (accessor != null && accessor.type == AccessorType.EXPLICIT) {
-                return accessor.name;
-            }
-        }
-        return null;
-    }
-
     private static class Property {
         String name;
 
@@ -183,31 +225,20 @@ class BeanIntrospector {
 
     private enum AccessorType {
         /**
-         * {@literal @}{@link com.fasterxml.jackson.annotation.JsonIgnore}
+         * {@literal @}{@link com.fasterxml.jackson.annotation.JsonIgnore}.
          */
         IGNORABLE,
         /**
-         * Looks like an accessor
+         * Looks like an accessor.
          */
         IMPLICIT,
         /**
-         * {@literal @}{@link JsonProperty} without name
+         * {@literal @}{@link JsonProperty} without name.
          */
         VISIBLE,
         /**
-         * {@literal @}{@link JsonProperty} with name
+         * {@literal @}{@link JsonProperty} with name.
          */
         EXPLICIT,
-    }
-
-    private static String decapitalize(String s) {
-        if (s.isEmpty()) return "";
-
-        char firstChar = s.charAt(0);
-        if (Character.isLowerCase(firstChar)) return s;
-
-        // todo: abbreviations at start of string
-
-        return Character.toLowerCase(firstChar) + s.substring(1);
     }
 }

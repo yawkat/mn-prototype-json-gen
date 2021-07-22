@@ -13,23 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.jsongen;
+package example;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
+import javax.inject.Singleton;
 
-import java.io.IOException;
-
-public interface Serializer<T> {
-    /**
-     * Deserialize from the given {@code decoder}.
-     * <p>
-     * The decoder {@link JsonParser#getCurrentToken()} should be positioned at the first token of this value.
-     *
-     * @param decoder The decoder to parse from
-     * @return The decoded value
-     */
-    T deserialize(JsonParser decoder) throws IOException;
-
-    void serialize(JsonGenerator encoder, T value) throws IOException;
+@Singleton
+public class Component {
 }

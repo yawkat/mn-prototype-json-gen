@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.jsongen.generator;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -13,10 +28,11 @@ import java.util.Map;
 import static io.micronaut.jsongen.generator.Names.DECODER;
 import static io.micronaut.jsongen.generator.Names.ENCODER;
 
-public class SingletonSerializerGenerator {
+public final class SingletonSerializerGenerator {
     static final String INSTANCE_FIELD_NAME = "INSTANCE";
 
-    private SingletonSerializerGenerator() {}
+    private SingletonSerializerGenerator() {
+    }
 
     public static GenerationResult generate(ClassElement clazz, SerializerSymbol symbol) {
         return generate(
@@ -29,9 +45,11 @@ public class SingletonSerializerGenerator {
 
     /**
      * @param serializerName FQCN of the generated serializer class
-     * @param valueName type name to use for the value being serialized, must be a reference type
-     * @param symbol symbol to use for serialization
-     * @param valueType type to pass to the symbol for code generation. Usually identical to {@code valueName}, except for primitives
+     * @param valueName      type name to use for the value being serialized, must be a reference type
+     * @param symbol         symbol to use for serialization
+     * @param valueType      type to pass to the symbol for code generation. Usually identical to {@code valueName}, except for primitives
+     *
+     * @return The generated serializer class
      */
     static GenerationResult generate(
             ClassName serializerName,
@@ -83,11 +101,28 @@ public class SingletonSerializerGenerator {
         return new GenerationResult(valueType, serializerName, generatedFile);
     }
 
-    public static class GenerationResult implements SerializerSymbol {
+    private static boolean isSameType(ClassElement a, ClassElement b) {
+        if (!a.getName().equals(b.getName())) {
+            return false;
+        }
+        Map<String, ClassElement> aArgs = a.getTypeArguments();
+        Map<String, ClassElement> bArgs = b.getTypeArguments();
+        if (!aArgs.keySet().equals(bArgs.keySet())) {
+            return false;
+        }
+        for (String argument : aArgs.keySet()) {
+            if (!isSameType(aArgs.get(argument), bArgs.get(argument))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static final class GenerationResult implements SerializerSymbol {
         private final ClassElement supportedValueType;
 
-        public final ClassName serializerClassName;
-        public final JavaFile generatedFile;
+        private final ClassName serializerClassName;
+        private final JavaFile generatedFile;
 
         private GenerationResult(ClassElement supportedValueType, ClassName serializerClassName, JavaFile generatedFile) {
             this.supportedValueType = supportedValueType;
@@ -109,18 +144,13 @@ public class SingletonSerializerGenerator {
         public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
             return new DeserializationCode(CodeBlock.of("$T.$N.deserialize($N)", serializerClassName, INSTANCE_FIELD_NAME, Names.DECODER));
         }
-    }
 
-    private static boolean isSameType(ClassElement a, ClassElement b) {
-        if (!a.getName().equals(b.getName())) return false;
-        Map<String, ClassElement> aArgs = a.getTypeArguments();
-        Map<String, ClassElement> bArgs = b.getTypeArguments();
-        if (!aArgs.keySet().equals(bArgs.keySet())) return false;
-        for (String argument : aArgs.keySet()) {
-            if (!isSameType(aArgs.get(argument), bArgs.get(argument))) {
-                return false;
-            }
+        public ClassName getSerializerClassName() {
+            return serializerClassName;
         }
-        return true;
+
+        public JavaFile getGeneratedFile() {
+            return generatedFile;
+        }
     }
 }
