@@ -31,6 +31,7 @@ class BeanIntrospector {
         Scanner scanner = new Scanner(forSerialization);
         scanner.scan(clazz);
         BeanDefinition beanDefinition = new BeanDefinition();
+        // note: this map is *not* in the right order anymore! (not a LinkedHashMap)
         Map<Property, BeanDefinition.Property> completeProps = scanner.byName.values().stream().collect(Collectors.toMap(
                 prop -> prop,
                 prop -> {
@@ -53,9 +54,9 @@ class BeanIntrospector {
                 }
         ));
         // filter out properties based on whether they're read/write-only
-        beanDefinition.props = completeProps.entrySet().stream()
-                .filter(e -> e.getKey().shouldInclude(forSerialization))
-                .map(Map.Entry::getValue)
+        beanDefinition.props = scanner.byName.values().stream()
+                .filter(e -> e.shouldInclude(forSerialization))
+                .map(completeProps::get)
                 .collect(Collectors.toList());
         if (scanner.creator == null) {
             if (scanner.defaultConstructor == null) {
@@ -129,10 +130,7 @@ class BeanIntrospector {
         private String getExplicitName(AnnotatedElement element) {
             AnnotationValue<JsonProperty> jsonProperty = element.getAnnotation(JsonProperty.class);
             if (jsonProperty != null) {
-                Optional<String> value = jsonProperty.getValue(String.class);
-                if (value.isPresent()) {
-                    return value.get();
-                }
+                return jsonProperty.getValue(String.class).orElse("");
             }
             return null;
         }
@@ -168,8 +166,6 @@ class BeanIntrospector {
 
             // note: clazz may be a superclass of our original class. in that case, the defaultConstructor will be overwritten.
             defaultConstructor = clazz.getDefaultConstructor().orElse(null);
-
-            // TODO: ignore private members
 
             for (FieldElement field : clazz.getFields()) {
                 if (field.isStatic()) {
