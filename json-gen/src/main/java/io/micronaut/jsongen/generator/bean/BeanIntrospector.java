@@ -101,12 +101,12 @@ class BeanIntrospector {
      * mostly follows jackson-jr AnnotationBasedIntrospector.
      */
     private static class Scanner {
+        final boolean forSerialization;
+
         final Map<String, Property> byImplicitName = new LinkedHashMap<>();
         Map<String, Property> byName;
 
         MethodElement defaultConstructor;
-
-        private final boolean forSerialization;
 
         MethodElement creator = null;
         List<Property> creatorProps;

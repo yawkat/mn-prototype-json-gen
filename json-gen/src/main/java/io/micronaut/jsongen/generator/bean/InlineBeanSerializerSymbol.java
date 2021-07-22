@@ -98,18 +98,18 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
         private final BeanDefinition definition;
         /**
-         * Types of all properties to deserialize
+         * Types of all properties to deserialize.
          */
         private final Map<BeanDefinition.Property, ClassElement> deserializeTypes;
         /**
-         * Names of the local variables properties are saved in
+         * Names of the local variables properties are saved in.
          */
         private final Map<BeanDefinition.Property, String> localVariableNames;
 
         private final DuplicatePropertyManager duplicatePropertyManager;
 
         /**
-         * Main deser code
+         * Main deser code.
          */
         private final CodeBlock.Builder deserialize = CodeBlock.builder();
 
@@ -188,7 +188,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         }
 
         /**
-         * Combine all the local variables into the final result variable
+         * Combine all the local variables into the final result variable.
          *
          * @return the result variable name
          */
