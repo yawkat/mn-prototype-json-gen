@@ -21,7 +21,12 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.jsongen.Serializer;
 
-class InjectingSerializerSymbol implements SerializerSymbol {
+final class InjectingSerializerSymbol implements SerializerSymbol {
+    static final InjectingSerializerSymbol INSTANCE = new InjectingSerializerSymbol();
+
+    private InjectingSerializerSymbol() {
+    }
+
     @Override
     public boolean canSerialize(ClassElement type) {
         // no generics of primitive types!

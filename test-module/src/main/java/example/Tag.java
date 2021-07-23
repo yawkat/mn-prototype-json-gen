@@ -15,9 +15,9 @@
  */
 package example;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.micronaut.jsongen.SerializableBean;
 
-@JsonIgnoreProperties
+@SerializableBean
 public final class Tag {
     private String value;
 

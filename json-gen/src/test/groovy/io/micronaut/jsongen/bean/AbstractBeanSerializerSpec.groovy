@@ -6,6 +6,7 @@ import io.micronaut.jsongen.Serializer
 import io.micronaut.jsongen.SerializerUtils
 import io.micronaut.jsongen.generator.SerializerLinker
 import io.micronaut.jsongen.generator.SingletonSerializerGenerator
+import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol
 import org.intellij.lang.annotations.Language
 
 import javax.tools.JavaFileObject
@@ -19,7 +20,7 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
         def classElement = buildClassElement(cls)
 
         def linker = new SerializerLinker()
-        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(classElement, linker.findSymbolForSerialize(classElement));
+        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(classElement, new InlineBeanSerializerSymbol(linker));
         def files = newJavaParser().generate(
                 new StringSourceJavaFileObject(classElement.name, cls),
                 new StringSourceJavaFileObject(result.serializerClassName.reflectionName(), result.generatedFile.toString())

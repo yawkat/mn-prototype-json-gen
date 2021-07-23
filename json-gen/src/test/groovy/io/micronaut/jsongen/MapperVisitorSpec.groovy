@@ -9,9 +9,7 @@ class MapperVisitorSpec extends AbstractTypeElementSpec implements SerializerUti
         def compiled = buildClassLoader('example.Test', '''
 package example;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-@JsonIgnoreProperties
+@io.micronaut.jsongen.SerializableBean
 public class Test {
 }
 ''')
@@ -28,15 +26,13 @@ public class Test {
         def compiled = buildClassLoader('example.Test', '''
 package example;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-@JsonIgnoreProperties
+@io.micronaut.jsongen.SerializableBean
 class A {
     B b;
     String bar;
 }
 
-@JsonIgnoreProperties
+@io.micronaut.jsongen.SerializableBean
 class B {
     String foo;
 }
@@ -70,10 +66,9 @@ class B {
         def compiled = buildClassLoader('example.Test', '''
 package example;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
-@JsonIgnoreProperties
+@io.micronaut.jsongen.SerializableBean
 class Test {
     List<String> list;
 }

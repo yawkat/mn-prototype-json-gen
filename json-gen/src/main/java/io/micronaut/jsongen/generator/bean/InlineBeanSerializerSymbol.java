@@ -41,7 +41,8 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public boolean canSerialize(ClassElement type) {
-        return true;
+        // this symbol is not part of the normal linker chain, so this does not apply.
+        throw new UnsupportedOperationException();
     }
 
     @Override

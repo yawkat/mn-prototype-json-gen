@@ -13,39 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example;
+package io.micronaut.jsongen;
 
-import io.micronaut.jsongen.SerializableBean;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-import java.util.List;
-
-@SerializableBean
-public final class Image {
-    private int id;
-    private String uri;
-    private List<Tag> tags;
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getUri() {
-        return uri;
-    }
-
-    public void setUri(String uri) {
-        this.uri = uri;
-    }
-
-    public List<Tag> getTags() {
-        return tags;
-    }
-
-    public void setTags(List<Tag> tags) {
-        this.tags = tags;
-    }
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.CLASS) // todo: is this sufficient for libraries?
+public @interface SerializableBean {
+    // boolean inline() default false; todo
 }

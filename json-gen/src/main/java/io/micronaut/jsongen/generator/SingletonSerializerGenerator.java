@@ -105,7 +105,7 @@ public final class SingletonSerializerGenerator {
         serializer.addMethod(constructorBuilder.build());
 
         JavaFile generatedFile = JavaFile.builder(serializerName.packageName(), serializer.build()).build();
-        return new GenerationResult(valueType, serializerName, generatedFile);
+        return new GenerationResult(serializerName, generatedFile);
     }
 
     private static boolean isSameType(ClassElement a, ClassElement b) {
@@ -126,21 +126,13 @@ public final class SingletonSerializerGenerator {
         return true;
     }
 
-    public static final class GenerationResult extends InjectingSerializerSymbol {
-        private final ClassElement supportedValueType;
-
+    public static final class GenerationResult {
         private final ClassName serializerClassName;
         private final JavaFile generatedFile;
 
-        private GenerationResult(ClassElement supportedValueType, ClassName serializerClassName, JavaFile generatedFile) {
-            this.supportedValueType = supportedValueType;
+        private GenerationResult(ClassName serializerClassName, JavaFile generatedFile) {
             this.serializerClassName = serializerClassName;
             this.generatedFile = generatedFile;
-        }
-
-        @Override
-        public boolean canSerialize(ClassElement type) {
-            return isSameType(type, supportedValueType);
         }
 
         public ClassName getSerializerClassName() {
