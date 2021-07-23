@@ -6,6 +6,8 @@ class InlineBeanSerializerSymbolSpec extends AbstractBeanSerializerSpec {
     void "simple bean"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 class Test {
     public String a;
     private String b;
@@ -36,6 +38,8 @@ class Test {
     void "JsonProperty on field"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 class Test {
     @JsonProperty("foo")
@@ -55,6 +59,8 @@ class Test {
     void "JsonProperty on getter"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 class Test {
     private String bar;
@@ -82,6 +88,8 @@ class Test {
     void "JsonProperty on accessors without prefix"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 class Test {
     private String bar;
@@ -110,6 +118,8 @@ class Test {
     void "JsonCreator constructor"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.*;
 class Test {
     @JsonProperty("foo")
@@ -137,6 +147,8 @@ class Test {
     void "JsonCreator constructor with properties mode set"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.*;
 class Test {
     @JsonProperty("foo")
@@ -164,6 +176,8 @@ class Test {
     void "JsonCreator static method"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.*;
 class Test {
     @JsonProperty("foo")
@@ -195,6 +209,8 @@ class Test {
     void "JsonCreator no getter"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.*;
 class Test {
     private final String bar;
@@ -218,6 +234,8 @@ class Test {
     void "duplicate property throws exception"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 class Test {
     String foo;
 }
@@ -234,6 +252,8 @@ class Test {
     void "missing required property throws exception"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.*;
 class Test {
     String foo;
@@ -255,6 +275,8 @@ class Test {
     void "missing required property throws exception, many variables"() {
         given:
         def compiled = buildSerializer('''
+package example;
+
 import com.fasterxml.jackson.annotation.*;
 class Test {
     String v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, 

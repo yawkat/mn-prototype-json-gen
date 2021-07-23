@@ -15,10 +15,27 @@
  */
 package example;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.jsongen.Serializer;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 
+@Singleton
 public final class Main {
-    public static void main(String[] args) {
+    private final Serializer<Image> listSerializer;
+
+    @Inject
+    public Main(Serializer<Image> listSerializer) {
+        this.listSerializer = listSerializer;
+    }
+
+    public static void main(String[] args) throws IOException {
         Image image = new Image();
         image.setId(123);
         image.setUri("https://imgur.com/op8V7KE");
@@ -29,5 +46,12 @@ public final class Main {
         Tag gif = new Tag();
         gif.setValue("gif");
         image.getTags().add(gif);
+
+        StringWriter stringWriter = new StringWriter();
+        try (ApplicationContext ctx = ApplicationContext.run();
+             JsonGenerator gen = new JsonFactory().createGenerator(stringWriter)) {
+            ctx.getBean(Main.class).listSerializer.serialize(gen, image);
+        }
+        System.out.println(stringWriter);
     }
 }

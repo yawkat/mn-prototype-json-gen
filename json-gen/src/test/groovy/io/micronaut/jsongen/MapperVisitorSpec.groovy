@@ -42,7 +42,6 @@ class B {
 }
 ''')
 
-
         def constructorA = compiled.loadClass("example.A").getDeclaredConstructor()
         constructorA.accessible = true
         def a = constructorA.newInstance()
@@ -55,8 +54,8 @@ class B {
         a.bar = "123"
         b.foo = "456"
 
-        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').getField("INSTANCE").get(null)
-        def serializerB = (Serializer<?>) compiled.loadClass('example.B$Serializer').getField("INSTANCE").get(null)
+        def serializerB = (Serializer<?>) compiled.loadClass('example.B$Serializer').getConstructor().newInstance()
+        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').getConstructor(Serializer.class).newInstance(serializerB)
 
         expect:
         serializeToString(serializerB, b) == '{"foo":"456"}'
@@ -80,14 +79,13 @@ class Test {
 }
 ''')
 
-
         def constructor = compiled.loadClass("example.Test").getDeclaredConstructor()
         constructor.accessible = true
         def test = constructor.newInstance()
 
         test.list = ['foo', 'bar']
 
-        def serializer = (Serializer<?>) compiled.loadClass('example.Test$Serializer').getField("INSTANCE").get(null)
+        def serializer = (Serializer<?>) compiled.loadClass('example.Test$Serializer').getConstructor().newInstance()
 
         expect:
         serializeToString(serializer, test) == '{"list":["foo","bar"]}'

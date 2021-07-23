@@ -20,6 +20,6 @@ class AbstractSymbolSpec extends AbstractTypeElementSpec implements SerializerUt
 
         def loader = buildClassLoader(generationResult.serializerClassName.reflectionName(), generationResult.generatedFile.toString())
         def serializerClass = loader.loadClass(generationResult.serializerClassName.reflectionName())
-        return (Serializer<T>) serializerClass.getField(SingletonSerializerGenerator.INSTANCE_FIELD_NAME).get(null)
+        return (Serializer<T>) serializerClass.getConstructor().newInstance()
     }
 }

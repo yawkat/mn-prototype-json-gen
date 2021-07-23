@@ -15,6 +15,9 @@
  */
 package example;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties
 public final class Tag {
     private String value;
 

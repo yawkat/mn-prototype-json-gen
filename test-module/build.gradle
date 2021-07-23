@@ -24,9 +24,8 @@ test {
 }
 
 micronaut {
-    version = "2.5.9"
+    version = "3.0.0-M2"
     processing {
         incremental(true)
-        annotations("my.openapi.app.*")
     }
 }

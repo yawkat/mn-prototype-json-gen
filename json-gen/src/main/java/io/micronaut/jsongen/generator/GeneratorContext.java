@@ -15,23 +15,35 @@
  */
 package io.micronaut.jsongen.generator;
 
-import java.util.HashSet;
-import java.util.Set;
+import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.TypeName;
 
-public class GeneratorContext {
+import java.util.*;
+
+public final class GeneratorContext {
     /**
      * A readable path to this context, used for better error messages.
      */
     private final String readablePath;
-    private final Set<String> usedVariables;
 
-    private GeneratorContext(String readablePath, Set<String> usedVariables) {
+    private final IdentifierScope fields;
+    private final IdentifierScope localVariables;
+
+    private final Map<TypeName, Injected> injected;
+
+    private GeneratorContext(
+            String readablePath,
+            IdentifierScope fields,
+            IdentifierScope localVariables,
+            Map<TypeName, Injected> injected) {
         this.readablePath = readablePath;
-        this.usedVariables = usedVariables;
+        this.fields = fields;
+        this.localVariables = localVariables;
+        this.injected = injected;
     }
 
-    public static GeneratorContext create(String rootReadablePath) {
-        return new GeneratorContext(rootReadablePath, new HashSet<>());
+    static GeneratorContext create(String rootReadablePath) {
+        return new GeneratorContext(rootReadablePath, new IdentifierScope(), null, new HashMap<>());
     }
 
     public String getReadablePath() {
@@ -39,20 +51,15 @@ public class GeneratorContext {
     }
 
     public GeneratorContext withSubPath(String element) {
-        // usedVariables is mutable, so we can just reuse it
-        return new GeneratorContext(readablePath + "->" + element, usedVariables);
+        // the other variables are mutable, so we can just reuse them
+        return new GeneratorContext(readablePath + "->" + element, fields, localVariables, injected);
     }
 
-    /**
-     * Register a local variable with a fixed name (e.g. a parameter)
-     *
-     * @param name The unique name of the local variable
-     * @throws IllegalStateException if the variable is already in use
-     */
-    public void registerLocalVariable(String name) {
-        if (!usedVariables.add(name)) {
-            throw new IllegalStateException("Variable already in use: " + name);
+    public GeneratorContext newMethodContext(String... usedLocals) {
+        if (this.localVariables != null) {
+            throw new IllegalStateException("Nesting of local variable scopes not supported");
         }
+        return new GeneratorContext(readablePath, fields, new IdentifierScope(usedLocals), injected);
     }
 
     /**
@@ -62,14 +69,59 @@ public class GeneratorContext {
      * @return The unique generated variable name
      */
     public String newLocalVariable(String nameHint) {
-        String sane = nameHint.replaceAll("[^a-zA-Z0-9]", "_");
-        if (usedVariables.add(sane)) {
-            return sane;
+        return localVariables.create(nameHint);
+    }
+
+    public Injected requestInjection(TypeName type) {
+        return injected.computeIfAbsent(type, t -> {
+            String fieldName = fields.create(t.toString());
+            return new Injected(fieldName, false);
+        });
+    }
+
+    public Map<TypeName, Injected> getInjected() {
+        return injected;
+    }
+
+    public static final class Injected {
+        final String fieldName;
+        final boolean provider;
+
+        private final CodeBlock accessExpression;
+
+        public Injected(String fieldName, boolean provider) {
+            this.fieldName = fieldName;
+            this.provider = provider;
+            if (provider) {
+                accessExpression = CodeBlock.of("this.$N.get()", fieldName);
+            } else {
+                accessExpression = CodeBlock.of("this.$N", fieldName);
+            }
         }
-        for (int i = 0; ; i++) {
-            String withSuffix = sane + "$" + i;
-            if (usedVariables.add(withSuffix)) {
-                return withSuffix;
+
+        public CodeBlock getAccessExpression() {
+            return accessExpression;
+        }
+    }
+
+    private static class IdentifierScope {
+        private final Set<String> identifiers;
+
+        public IdentifierScope(String... predefined) {
+            identifiers = new HashSet<>(Arrays.asList(predefined));
+        }
+
+        String create(String nameHint) {
+            // todo: handle reserved identifiers
+            String sane = nameHint.replaceAll("[^a-zA-Z0-9]", "_");
+            if (identifiers.add(sane)) {
+                return sane;
+            }
+            for (int i = 0; ; i++) {
+                String withSuffix = sane + "$" + i;
+                if (identifiers.add(withSuffix)) {
+                    return withSuffix;
+                }
             }
         }
     }
