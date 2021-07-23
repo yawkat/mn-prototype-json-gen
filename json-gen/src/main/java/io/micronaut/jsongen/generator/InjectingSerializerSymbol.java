@@ -23,17 +23,25 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.jsongen.Serializer;
 
 final class InjectingSerializerSymbol implements SerializerSymbol {
-    static final InjectingSerializerSymbol INSTANCE = new InjectingSerializerSymbol(false);
-
-    private static final InjectingSerializerSymbol INSTANCE_PROVIDER = new InjectingSerializerSymbol(true);
+    private final SerializerLinker linker;
 
     /**
      * Whether to wrap the injection with a {@link BeanProvider}.
      */
     private final boolean provider;
 
-    private InjectingSerializerSymbol(boolean provider) {
+    public InjectingSerializerSymbol(SerializerLinker linker) {
+        this(linker, false);
+    }
+
+    private InjectingSerializerSymbol(SerializerLinker linker, boolean provider) {
+        this.linker = linker;
         this.provider = provider;
+    }
+
+    @Override
+    public void visitDependencies(DependencyVisitor visitor, ClassElement type) {
+        visitor.visitInjected(type, provider);
     }
 
     @Override
@@ -44,7 +52,7 @@ final class InjectingSerializerSymbol implements SerializerSymbol {
 
     @Override
     public SerializerSymbol withRecursiveSerialization() {
-        return INSTANCE_PROVIDER;
+        return new InjectingSerializerSymbol(linker, true);
     }
 
     @Override

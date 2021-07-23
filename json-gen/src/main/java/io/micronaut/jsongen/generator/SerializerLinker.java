@@ -29,7 +29,7 @@ public final class SerializerLinker {
             arrayList,
             PrimitiveSerializerSymbol.INSTANCE,
             StringSerializerSymbol.INSTANCE,
-            InjectingSerializerSymbol.INSTANCE
+            new InjectingSerializerSymbol(this)
     );
 
     public SerializerSymbol findSymbol(ClassElement type) {

@@ -116,4 +116,40 @@ class Test {
         // serializeToString(serializer, test) == '{"list":["foo","bar"]}' todo: null support
         deserializeFromString(serializer, '{"foo":{}}').foo.foo == null
     }
+
+    void "simple recursive without proper annotation gives error"() {
+        when:
+        buildClassLoader('example.Test', '''
+package example;
+
+@io.micronaut.jsongen.SerializableBean
+class Test {
+    Test foo;
+}
+''')
+        then:
+        def e = thrown Exception
+
+        expect:
+        e.message.contains("Circular dependency")
+        e.message.contains("foo")
+    }
+
+    void "list recursive without proper annotation gives error"() {
+        when:
+        buildClassLoader('example.Test', '''
+package example;
+
+@io.micronaut.jsongen.SerializableBean
+class Test {
+    Test[] foo;
+}
+''')
+        then:
+        def e = thrown Exception
+
+        expect:
+        e.message.contains("Circular dependency")
+        e.message.contains("foo")
+    }
 }

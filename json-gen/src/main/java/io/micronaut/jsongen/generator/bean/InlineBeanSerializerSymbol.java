@@ -45,6 +45,21 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public void visitDependencies(DependencyVisitor visitor, ClassElement type) {
+        // have to check both ser/deser, in case property types differ (e.g. when setters and getters have different types)
+        // technically, this could lead to false positives for checking, since ser types will be considered in a subgraph that is only reachable through deser
+        for (boolean ser : new boolean[] {true, false}) {
+            for (BeanDefinition.Property prop : BeanIntrospector.introspect(type, ser).props) {
+                SerializerSymbol symbol = linker.findSymbol(prop.getType());
+                if (prop.permitRecursiveSerialization) {
+                    symbol = symbol.withRecursiveSerialization();
+                }
+                visitor.visitInline(symbol, prop.getType(), prop.getElement());
+            }
+        }
+    }
+
     private SerializerSymbol findSymbol(BeanDefinition.Property prop) {
         SerializerSymbol symbol = linker.findSymbol(prop.getType());
         if (prop.permitRecursiveSerialization) {

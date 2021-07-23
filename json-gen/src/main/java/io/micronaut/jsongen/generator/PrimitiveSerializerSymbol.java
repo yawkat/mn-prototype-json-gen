@@ -36,6 +36,11 @@ final class PrimitiveSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
+    public void visitDependencies(DependencyVisitor visitor, ClassElement type) {
+        // scalar, no dependencies
+    }
+
+    @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         if (type.equals(PrimitiveElement.BOOLEAN)) {
             return CodeBlock.of("$N.writeBoolean($L);\n", ENCODER, readExpression);

@@ -16,7 +16,9 @@
 package io.micronaut.jsongen.generator;
 
 import com.squareup.javapoet.CodeBlock;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 
 public interface SerializerSymbol {
     boolean canSerialize(ClassElement type);
@@ -27,6 +29,8 @@ public interface SerializerSymbol {
     default SerializerSymbol withRecursiveSerialization() {
         return this;
     }
+
+    void visitDependencies(DependencyVisitor visitor, ClassElement type);
 
     /**
      * Generate code that writes the value returned by {@code readExpression} into {@link Names#ENCODER}.
@@ -77,5 +81,11 @@ public interface SerializerSymbol {
         public CodeBlock getResultExpression() {
             return resultExpression;
         }
+    }
+
+    interface DependencyVisitor {
+        void visitInline(SerializerSymbol dependencySymbol, ClassElement dependencyType, @Nullable Element element);
+
+        void visitInjected(ClassElement dependencyType, boolean provider);
     }
 }

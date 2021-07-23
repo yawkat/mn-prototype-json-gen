@@ -25,7 +25,6 @@ import jakarta.inject.Inject;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
-import java.util.Map;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
 import static io.micronaut.jsongen.generator.Names.ENCODER;
@@ -101,24 +100,6 @@ public final class SingletonSerializerGenerator {
 
         JavaFile generatedFile = JavaFile.builder(serializerName.packageName(), serializer.build()).build();
         return new GenerationResult(serializerName, generatedFile);
-    }
-
-    private static boolean isSameType(ClassElement a, ClassElement b) {
-        // todo: mn3 .equals
-        if (!a.getName().equals(b.getName())) {
-            return false;
-        }
-        Map<String, ClassElement> aArgs = a.getTypeArguments();
-        Map<String, ClassElement> bArgs = b.getTypeArguments();
-        if (!aArgs.keySet().equals(bArgs.keySet())) {
-            return false;
-        }
-        for (String argument : aArgs.keySet()) {
-            if (!isSameType(aArgs.get(argument), bArgs.get(argument))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     public static final class GenerationResult {

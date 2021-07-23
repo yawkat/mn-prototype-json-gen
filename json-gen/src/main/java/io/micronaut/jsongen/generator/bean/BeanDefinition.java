@@ -15,10 +15,7 @@
  */
 package io.micronaut.jsongen.generator.bean;
 
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.*;
 
 import java.util.List;
 import java.util.Objects;
@@ -63,7 +60,24 @@ class BeanDefinition {
             } else if (creatorParameter != null) {
                 return creatorParameter.getGenericType();
             } else {
-                throw new AssertionError("Cannot determine type, this property should have been filtered out during introspection");
+                throw new AssertionError();
+            }
+        }
+
+        /**
+         * The element corresponding to this property. Used for warning messages.
+         */
+        public Element getElement() {
+            if (getter != null) {
+                return getter;
+            } else if (setter != null) {
+                return setter;
+            } else if (field != null) {
+                return field;
+            } else if (creatorParameter != null) {
+                return creatorParameter;
+            } else {
+                throw new AssertionError();
             }
         }
 

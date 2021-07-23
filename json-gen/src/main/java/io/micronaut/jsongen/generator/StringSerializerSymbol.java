@@ -35,6 +35,11 @@ final class StringSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
+    public void visitDependencies(DependencyVisitor visitor, ClassElement type) {
+        // scalar, no dependencies
+    }
+
+    @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         // todo: handle charsequence
         return CodeBlock.of("$N.writeString($L);\n", ENCODER, readExpression);

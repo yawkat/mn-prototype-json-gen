@@ -22,6 +22,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.jsongen.generator.SerializerLinker;
 import io.micronaut.jsongen.generator.SingletonSerializerGenerator;
+import io.micronaut.jsongen.generator.bean.DependencyGraphChecker;
 import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol;
 
 import javax.annotation.processing.Filer;
@@ -35,6 +36,11 @@ public class MapperVisitor implements TypeElementVisitor<SerializableBean, Seria
     public void visitClass(ClassElement element, VisitorContext context) {
         SerializerLinker linker = new SerializerLinker();
         InlineBeanSerializerSymbol inlineBeanSerializer = new InlineBeanSerializerSymbol(linker);
+        DependencyGraphChecker depChecker = new DependencyGraphChecker(context, linker);
+        depChecker.checkCircularDependencies(inlineBeanSerializer, element, element);
+        if (depChecker.hasAnyFailures()) {
+            return;
+        }
         SingletonSerializerGenerator.GenerationResult generationResult = SingletonSerializerGenerator.generate(element, inlineBeanSerializer);
 
         // todo: gen serviceloader
