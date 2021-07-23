@@ -31,8 +31,8 @@ class BeanIntrospector {
         Scanner scanner = new Scanner(forSerialization);
         scanner.scan(clazz);
         BeanDefinition beanDefinition = new BeanDefinition();
-        Map<Property, BeanDefinition.Property> completeProps = new LinkedHashMap<>();
-        for (Property prop : scanner.byName.values()) {
+        Map<PropBuilder, BeanDefinition.Property> completeProps = new LinkedHashMap<>();
+        for (PropBuilder prop : scanner.byName.values()) {
             // remove hidden accessors
             prop.trimInaccessible(forSerialization);
             // filter out properties based on whether they're read/write-only
@@ -105,27 +105,27 @@ class BeanIntrospector {
     private static class Scanner {
         final boolean forSerialization;
 
-        final Map<String, Property> byImplicitName = new LinkedHashMap<>();
-        Map<String, Property> byName;
+        final Map<String, PropBuilder> byImplicitName = new LinkedHashMap<>();
+        Map<String, PropBuilder> byName;
 
         MethodElement defaultConstructor;
 
         MethodElement creator = null;
-        List<Property> creatorProps;
+        List<PropBuilder> creatorProps;
 
         Scanner(boolean forSerialization) {
             this.forSerialization = forSerialization;
         }
 
-        private Property getByImplicitName(String implicitName) {
-            return byImplicitName.computeIfAbsent(implicitName, s -> new Property());
+        private PropBuilder getByImplicitName(String implicitName) {
+            return byImplicitName.computeIfAbsent(implicitName, s -> new PropBuilder());
         }
 
-        private Property getByName(String name) {
+        private PropBuilder getByName(String name) {
             return byName.computeIfAbsent(name, s -> {
-                Property property = new Property();
-                property.name = s;
-                return property;
+                PropBuilder prop = new PropBuilder();
+                prop.name = s;
+                return prop;
             });
         }
 
@@ -174,7 +174,7 @@ class BeanIntrospector {
                     continue;
                 }
 
-                Property prop = getByImplicitName(field.getName());
+                PropBuilder prop = getByImplicitName(field.getName());
                 prop.field = makeAccessor(field, field.getName());
             }
 
@@ -195,12 +195,12 @@ class BeanIntrospector {
                     }
 
                     if (implicitName != null) {
-                        Property prop = getByImplicitName(implicitName);
+                        PropBuilder prop = getByImplicitName(implicitName);
                         prop.getter = makeAccessor(method, implicitName);
                     } else {
                         if (getExplicitName(method) != null) {
                             // if we have an explicit @JsonProperty, fall back to just the method name as the implicit name
-                            Property prop = getByImplicitName(method.getName());
+                            PropBuilder prop = getByImplicitName(method.getName());
                             prop.getter = makeAccessor(method, method.getName());
                         }
                     }
@@ -214,12 +214,12 @@ class BeanIntrospector {
                     }
 
                     if (implicitName != null) {
-                        Property prop = getByImplicitName(implicitName);
+                        PropBuilder prop = getByImplicitName(implicitName);
                         prop.setter = makeAccessor(method, implicitName);
                     } else {
                         if (getExplicitName(method) != null) {
                             // if we have an explicit @JsonProperty, fall back to just the method name as the implicit name
-                            Property prop = getByImplicitName(method.getName());
+                            PropBuilder prop = getByImplicitName(method.getName());
                             prop.setter = makeAccessor(method, method.getName());
                         }
                     }
@@ -227,8 +227,8 @@ class BeanIntrospector {
             }
 
             byName = new LinkedHashMap<>();
-            for (Map.Entry<String, Property> entry : byImplicitName.entrySet()) {
-                Property prop = entry.getValue();
+            for (Map.Entry<String, PropBuilder> entry : byImplicitName.entrySet()) {
+                PropBuilder prop = entry.getValue();
                 String explicitName = forSerialization ? firstExplicitName(prop.getter, prop.setter, prop.field) : firstExplicitName(prop.setter, prop.getter, prop.field);
                 prop.name = explicitName == null ? entry.getKey() : explicitName;
                 byName.put(prop.name, prop);
@@ -287,7 +287,7 @@ class BeanIntrospector {
                     String propName = propertyAnnotation.getValue(String.class)
                             // we allow empty property names here, as long as they're explicitly defined.
                             .orElseThrow(() -> new UnsupportedOperationException("@JsonProperty name cannot be missing on a creator"));
-                    Property prop = getByName(propName);
+                    PropBuilder prop = getByName(propName);
                     prop.creatorParameter = parameter;
                     creatorProps.add(prop);
                 }
@@ -295,7 +295,7 @@ class BeanIntrospector {
         }
     }
 
-    private static class Property {
+    private static class PropBuilder {
         String name;
 
         @Nullable
