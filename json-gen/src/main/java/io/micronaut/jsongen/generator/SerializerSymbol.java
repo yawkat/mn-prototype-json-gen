@@ -22,6 +22,13 @@ public interface SerializerSymbol {
     boolean canSerialize(ClassElement type);
 
     /**
+     * @return a symbol equivalent to this one, but with the capability of dealing with recursive / circular serialization issues.
+     */
+    default SerializerSymbol withRecursiveSerialization() {
+        return this;
+    }
+
+    /**
      * Generate code that writes the value returned by {@code readExpression} into {@link Names#ENCODER}.
      *
      * @param generatorContext The context of the generator, e.g. declared local variables.

@@ -2,6 +2,7 @@ package io.micronaut.jsongen
 
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.BeanProvider
 
 class MapperVisitorSpec extends AbstractTypeElementSpec implements SerializerUtils {
     void "generator creates a serializer for jackson annotations"() {
@@ -85,5 +86,34 @@ class Test {
         expect:
         serializeToString(serializer, test) == '{"list":["foo","bar"]}'
         deserializeFromString(serializer, '{"list":["foo","bar"]}').list == ['foo', 'bar']
+    }
+
+    void "recursive with proper annotation"() {
+        given:
+        def compiled = buildClassLoader('example.Test', '''
+package example;
+
+@io.micronaut.jsongen.SerializableBean
+class Test {
+    @io.micronaut.jsongen.RecursiveSerialization Test foo;
+}
+''')
+
+        def constructor = compiled.loadClass("example.Test").getDeclaredConstructor()
+        constructor.accessible = true
+        def test = constructor.newInstance()
+        test.foo = constructor.newInstance()
+
+        def provider = new BeanProvider() {
+            @Override
+            Object get() {
+                return (Serializer<?>) compiled.loadClass('example.Test$Serializer').getConstructor(BeanProvider.class).newInstance(this)
+            }
+        }
+        def serializer = provider.get()
+
+        expect:
+        // serializeToString(serializer, test) == '{"list":["foo","bar"]}' todo: null support
+        deserializeFromString(serializer, '{"foo":{}}').foo.foo == null
     }
 }

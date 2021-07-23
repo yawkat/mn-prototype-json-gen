@@ -17,7 +17,6 @@ package io.micronaut.jsongen.generator;
 
 import io.micronaut.inject.ast.ClassElement;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -25,33 +24,15 @@ public final class SerializerLinker {
     final InlineIterableSerializerSymbol.ArrayImpl array = new InlineIterableSerializerSymbol.ArrayImpl(this);
     final InlineIterableSerializerSymbol.ArrayListImpl arrayList = new InlineIterableSerializerSymbol.ArrayListImpl(this);
 
-    private final List<SerializerSymbol> symbolList = new ArrayList<>(Arrays.asList(
+    private final List<SerializerSymbol> symbolList = Arrays.asList(
             array,
             arrayList,
             PrimitiveSerializerSymbol.INSTANCE,
             StringSerializerSymbol.INSTANCE,
             InjectingSerializerSymbol.INSTANCE
-    ));
+    );
 
-    public SerializerSymbol findSymbolForSerialize(ClassElement type) {
-        return findSymbolGeneric(type);
-    }
-
-    public SerializerSymbol findSymbolForDeserialize(ClassElement type) {
-        return findSymbolGeneric(type);
-    }
-
-    protected void registerSymbol(SerializerSymbol symbol) {
-        symbolList.add(0, symbol);
-    }
-
-    /**
-     * Find a symbol for generating serialization code of the given {@code type}.
-     *
-     * @param type The type to be (de)serialized
-     * @return The serializer symbol to use
-     */
-    protected SerializerSymbol findSymbolGeneric(ClassElement type) {
+    public SerializerSymbol findSymbol(ClassElement type) {
         for (SerializerSymbol serializerSymbol : symbolList) {
             if (serializerSymbol.canSerialize(type)) {
                 return serializerSymbol;

@@ -18,7 +18,6 @@ package io.micronaut.jsongen.generator;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.squareup.javapoet.*;
-import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.jsongen.Serializer;
@@ -49,7 +48,6 @@ public final class SingletonSerializerGenerator {
      * @param valueName      type name to use for the value being serialized, must be a reference type
      * @param symbol         symbol to use for serialization
      * @param valueType      type to pass to the symbol for code generation. Usually identical to {@code valueName}, except for primitives
-     *
      * @return The generated serializer class
      */
     static GenerationResult generate(
@@ -94,9 +92,6 @@ public final class SingletonSerializerGenerator {
                 .addAnnotation(Inject.class);
         CodeBlock.Builder constructorCodeBuilder = CodeBlock.builder();
         classContext.getInjected().forEach((type, injected) -> {
-            if (injected.provider) {
-                type = ParameterizedTypeName.get(ClassName.get(BeanProvider.class), type);
-            }
             constructorBuilder.addParameter(type, injected.fieldName);
             constructorCodeBuilder.addStatement("this.$N = $N", injected.fieldName, injected.fieldName);
             serializer.addField(type, injected.fieldName, Modifier.PRIVATE, Modifier.FINAL);

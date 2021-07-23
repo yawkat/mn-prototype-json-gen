@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.*;
+import io.micronaut.jsongen.RecursiveSerialization;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -39,25 +40,26 @@ class BeanIntrospector {
             if (!prop.shouldInclude(forSerialization)) {
                 continue;
             }
-            BeanDefinition.Property finished;
+            BeanDefinition.Property built;
             if (forSerialization) {
                 if (prop.getter != null) {
-                    finished = BeanDefinition.Property.getter(prop.name, prop.getter.accessor);
+                    built = BeanDefinition.Property.getter(prop.name, prop.getter.accessor);
                 } else {
                     assert prop.field != null;
-                    finished = BeanDefinition.Property.field(prop.name, prop.field.accessor);
+                    built = BeanDefinition.Property.field(prop.name, prop.field.accessor);
                 }
             } else {
                 if (prop.creatorParameter != null) {
-                    finished = BeanDefinition.Property.creatorParameter(prop.name, prop.creatorParameter);
+                    built = BeanDefinition.Property.creatorParameter(prop.name, prop.creatorParameter);
                 } else if (prop.setter != null) {
-                    finished = BeanDefinition.Property.setter(prop.name, prop.setter.accessor);
+                    built = BeanDefinition.Property.setter(prop.name, prop.setter.accessor);
                 } else {
                     assert prop.field != null;
-                    finished = BeanDefinition.Property.field(prop.name, prop.field.accessor);
+                    built = BeanDefinition.Property.field(prop.name, prop.field.accessor);
                 }
             }
-            completeProps.put(prop, finished);
+            built = built.withPermitRecursiveSerialization(prop.permitRecursiveSerialization);
+            completeProps.put(prop, built);
         }
         beanDefinition.props = new ArrayList<>(completeProps.values());
         if (scanner.creator == null) {
@@ -240,6 +242,25 @@ class BeanIntrospector {
             for (ConstructorElement constructor : clazz.getEnclosedElements(ElementQuery.of(ConstructorElement.class).annotated(m -> m.hasAnnotation(JsonCreator.class)))) {
                 handleCreator(constructor);
             }
+
+            // if there's a @RecursiveSerialization on *any* of the involved elements, mark the property for recursive ser
+            for (PropBuilder prop : byName.values()) {
+                if (prop.field != null && prop.field.accessor.hasAnnotation(RecursiveSerialization.class)) {
+                    prop.permitRecursiveSerialization = true;
+                    continue;
+                }
+                if (prop.setter != null && prop.setter.accessor.hasAnnotation(RecursiveSerialization.class)) {
+                    prop.permitRecursiveSerialization = true;
+                    continue;
+                }
+                if (prop.getter != null && prop.getter.accessor.hasAnnotation(RecursiveSerialization.class)) {
+                    prop.permitRecursiveSerialization = true;
+                    continue;
+                }
+                if (prop.creatorParameter != null && prop.creatorParameter.hasAnnotation(RecursiveSerialization.class)) {
+                    prop.permitRecursiveSerialization = true;
+                }
+            }
         }
 
         private void handleCreator(MethodElement method) {
@@ -297,6 +318,8 @@ class BeanIntrospector {
 
     private static class PropBuilder {
         String name;
+
+        boolean permitRecursiveSerialization;
 
         @Nullable
         Accessor<FieldElement> field;

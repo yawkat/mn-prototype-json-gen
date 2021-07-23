@@ -18,19 +18,33 @@ package io.micronaut.jsongen.generator;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.ParameterizedTypeName;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.jsongen.Serializer;
 
 final class InjectingSerializerSymbol implements SerializerSymbol {
-    static final InjectingSerializerSymbol INSTANCE = new InjectingSerializerSymbol();
+    static final InjectingSerializerSymbol INSTANCE = new InjectingSerializerSymbol(false);
 
-    private InjectingSerializerSymbol() {
+    private static final InjectingSerializerSymbol INSTANCE_PROVIDER = new InjectingSerializerSymbol(true);
+
+    /**
+     * Whether to wrap the injection with a {@link BeanProvider}.
+     */
+    private final boolean provider;
+
+    private InjectingSerializerSymbol(boolean provider) {
+        this.provider = provider;
     }
 
     @Override
     public boolean canSerialize(ClassElement type) {
         // no generics of primitive types!
         return type.isArray() || !type.isPrimitive();
+    }
+
+    @Override
+    public SerializerSymbol withRecursiveSerialization() {
+        return INSTANCE_PROVIDER;
     }
 
     @Override
@@ -44,6 +58,14 @@ final class InjectingSerializerSymbol implements SerializerSymbol {
     }
 
     private CodeBlock getSerializerAccess(GeneratorContext generatorContext, ClassElement type) {
-        return generatorContext.requestInjection(ParameterizedTypeName.get(ClassName.get(Serializer.class), PoetUtil.toTypeName(type))).getAccessExpression();
+        ParameterizedTypeName serializerType = ParameterizedTypeName.get(ClassName.get(Serializer.class), PoetUtil.toTypeName(type));
+        if (provider) {
+            serializerType = ParameterizedTypeName.get(ClassName.get(BeanProvider.class), serializerType);
+        }
+        CodeBlock accessExpression = generatorContext.requestInjection(serializerType).getAccessExpression();
+        if (provider) {
+            accessExpression = CodeBlock.of("$L.get()", accessExpression);
+        }
+        return accessExpression;
     }
 }

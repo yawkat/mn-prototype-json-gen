@@ -41,9 +41,15 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     protected abstract ClassElement getElementType(ClassElement type);
 
     @Override
+    public SerializerSymbol withRecursiveSerialization() {
+        // TODO
+        return SerializerSymbol.super.withRecursiveSerialization();
+    }
+
+    @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         ClassElement elementType = getElementType(type);
-        SerializerSymbol elementSerializer = linker.findSymbolForSerialize(elementType);
+        SerializerSymbol elementSerializer = linker.findSymbol(elementType);
         return CodeBlock.builder()
                 .addStatement("$N.writeStartArray()", ENCODER)
                 .beginControlFlow("for ($T item : $L)", PoetUtil.toTypeName(elementType), readExpression)
@@ -56,7 +62,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     @Override
     public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
         ClassElement elementType = getElementType(type);
-        SerializerSymbol elementDeserializer = linker.findSymbolForDeserialize(elementType);
+        SerializerSymbol elementDeserializer = linker.findSymbol(elementType);
 
         String intermediateVariable = generatorContext.newLocalVariable("intermediate");
 

@@ -45,6 +45,14 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         throw new UnsupportedOperationException();
     }
 
+    private SerializerSymbol findSymbol(BeanDefinition.Property prop) {
+        SerializerSymbol symbol = linker.findSymbol(prop.getType());
+        if (prop.permitRecursiveSerialization) {
+            symbol = symbol.withRecursiveSerialization();
+        }
+        return symbol;
+    }
+
     @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
         BeanDefinition definition = BeanIntrospector.introspect(type, true);
@@ -57,19 +65,15 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         serialize.addStatement("$N.writeStartObject($N)", ENCODER, objectVarName);
         for (BeanDefinition.Property prop : definition.props) {
             serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
-            ClassElement propType;
             CodeBlock propRead;
             if (prop.getter != null) {
-                propType = prop.getter.getGenericReturnType();
                 propRead = CodeBlock.of("$N.$N()", objectVarName, prop.getter.getName());
             } else if (prop.field != null) {
-                propType = prop.field.getGenericType();
                 propRead = CodeBlock.of("$N.$N", objectVarName, prop.field.getName());
             } else {
                 throw new AssertionError("No accessor, property should have been filtered");
             }
-            serialize.add(linker.findSymbolForSerialize(propType)
-                    .serialize(generatorContext.withSubPath(prop.name), propType, propRead));
+            serialize.add(findSymbol(prop).serialize(generatorContext.withSubPath(prop.name), prop.getType(), propRead));
         }
         serialize.addStatement("$N.writeEndObject()", ENCODER);
         return serialize.build();
@@ -168,9 +172,8 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         private void deserializeProperty(BeanDefinition.Property prop) {
             duplicatePropertyManager.emitReadVariable(deserialize, prop);
 
-            ClassElement propType = prop.getType();
-            SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType)
-                    .deserialize(generatorContext.withSubPath(prop.name), propType);
+            SerializerSymbol.DeserializationCode deserializationCode = findSymbol(prop)
+                    .deserialize(generatorContext.withSubPath(prop.name), prop.getType());
             deserialize.add(deserializationCode.getStatements());
             deserialize.addStatement("$N = $L", localVariableNames.get(prop), deserializationCode.getResultExpression());
         }

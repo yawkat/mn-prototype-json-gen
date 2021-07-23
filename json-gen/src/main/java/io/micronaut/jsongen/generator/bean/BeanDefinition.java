@@ -29,7 +29,7 @@ class BeanDefinition {
 
     List<Property> props;
 
-    static class Property {
+    final static class Property {
         final String name;
 
         // exactly one of these is not null
@@ -38,12 +38,19 @@ class BeanDefinition {
         final MethodElement setter;
         final ParameterElement creatorParameter;
 
-        private Property(String name, FieldElement field, MethodElement getter, MethodElement setter, ParameterElement creatorParameter) {
+        final boolean permitRecursiveSerialization;
+
+        private Property(String name, FieldElement field, MethodElement getter, MethodElement setter, ParameterElement creatorParameter, boolean permitRecursiveSerialization) {
             this.name = name;
             this.field = field;
             this.getter = getter;
             this.setter = setter;
             this.creatorParameter = creatorParameter;
+            this.permitRecursiveSerialization = permitRecursiveSerialization;
+        }
+
+        public Property withPermitRecursiveSerialization(boolean value) {
+            return new Property(name, field, getter, setter, creatorParameter, value);
         }
 
         public ClassElement getType() {
@@ -62,22 +69,22 @@ class BeanDefinition {
 
         static Property field(String name, FieldElement field) {
             Objects.requireNonNull(field, "field");
-            return new Property(name, field, null, null, null);
+            return new Property(name, field, null, null, null, false);
         }
 
         static Property getter(String name, MethodElement getter) {
             Objects.requireNonNull(getter, "getter");
-            return new Property(name, null, getter, null, null);
+            return new Property(name, null, getter, null, null, false);
         }
 
         static Property setter(String name, MethodElement setter) {
             Objects.requireNonNull(setter, "setter");
-            return new Property(name, null, null, setter, null);
+            return new Property(name, null, null, setter, null, false);
         }
 
         static Property creatorParameter(String name, ParameterElement creatorParameter) {
             Objects.requireNonNull(creatorParameter, "creatorParameter");
-            return new Property(name, null, null, null, creatorParameter);
+            return new Property(name, null, null, null, creatorParameter, false);
         }
     }
 }

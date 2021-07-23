@@ -75,7 +75,7 @@ public final class GeneratorContext {
     public Injected requestInjection(TypeName type) {
         return injected.computeIfAbsent(type, t -> {
             String fieldName = fields.create(t.toString());
-            return new Injected(fieldName, false);
+            return new Injected(fieldName);
         });
     }
 
@@ -85,18 +85,12 @@ public final class GeneratorContext {
 
     public static final class Injected {
         final String fieldName;
-        final boolean provider;
 
         private final CodeBlock accessExpression;
 
-        public Injected(String fieldName, boolean provider) {
+        private Injected(String fieldName) {
             this.fieldName = fieldName;
-            this.provider = provider;
-            if (provider) {
-                accessExpression = CodeBlock.of("this.$N.get()", fieldName);
-            } else {
-                accessExpression = CodeBlock.of("this.$N", fieldName);
-            }
+            this.accessExpression = CodeBlock.of("this.$N", fieldName);
         }
 
         public CodeBlock getAccessExpression() {
