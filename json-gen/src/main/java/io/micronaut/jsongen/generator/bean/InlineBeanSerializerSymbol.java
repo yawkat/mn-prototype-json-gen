@@ -100,10 +100,6 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
         private final BeanDefinition definition;
         /**
-         * Types of all properties to deserialize.
-         */
-        private final Map<BeanDefinition.Property, ClassElement> deserializeTypes;
-        /**
          * Names of the local variables properties are saved in.
          */
         private final Map<BeanDefinition.Property, String> localVariableNames;
@@ -120,17 +116,6 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             this.type = type;
 
             definition = BeanIntrospector.introspect(type, false);
-            deserializeTypes = definition.props.stream().collect(Collectors.toMap(prop -> prop, prop -> {
-                if (prop.setter != null) {
-                    return prop.setter.getParameters()[0].getGenericType(); // TODO: bounds checks
-                } else if (prop.field != null) {
-                    return prop.field.getGenericType();
-                } else if (prop.creatorParameter != null) {
-                    return prop.creatorParameter.getGenericType();
-                } else {
-                    throw new AssertionError("Cannot determine type, this property should have been filtered out during introspection");
-                }
-            }));
             localVariableNames = definition.props.stream()
                     .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
             duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, definition.props);
@@ -144,7 +129,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
             // create a local variable for each property
             for (BeanDefinition.Property prop : definition.props) {
-                deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(deserializeTypes.get(prop)), localVariableNames.get(prop), getDefaultValueExpression(deserializeTypes.get(prop)));
+                deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(prop.getType()), localVariableNames.get(prop), getDefaultValueExpression(prop.getType()));
             }
 
             // main parse loop
@@ -183,7 +168,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         private void deserializeProperty(BeanDefinition.Property prop) {
             duplicatePropertyManager.emitReadVariable(deserialize, prop);
 
-            ClassElement propType = deserializeTypes.get(prop);
+            ClassElement propType = prop.getType();
             SerializerSymbol.DeserializationCode deserializationCode = linker.findSymbolForDeserialize(propType)
                     .deserialize(generatorContext.withSubPath(prop.name), propType);
             deserialize.add(deserializationCode.getStatements());

@@ -15,12 +15,13 @@
  */
 package io.micronaut.jsongen.generator.bean;
 
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
 import java.util.List;
+import java.util.Objects;
 
 class BeanDefinition {
     MethodElement creator;
@@ -31,17 +32,52 @@ class BeanDefinition {
     static class Property {
         final String name;
 
-        @Nullable
-        FieldElement field = null;
-        @Nullable
-        MethodElement getter = null;
-        @Nullable
-        MethodElement setter = null;
-        @Nullable
-        ParameterElement creatorParameter = null;
+        // exactly one of these is not null
+        final FieldElement field;
+        final MethodElement getter;
+        final MethodElement setter;
+        final ParameterElement creatorParameter;
 
-        Property(String name) {
+        private Property(String name, FieldElement field, MethodElement getter, MethodElement setter, ParameterElement creatorParameter) {
             this.name = name;
+            this.field = field;
+            this.getter = getter;
+            this.setter = setter;
+            this.creatorParameter = creatorParameter;
+        }
+
+        public ClassElement getType() {
+            if (getter != null) {
+                return getter.getGenericReturnType();
+            } else if (setter != null) {
+                return setter.getParameters()[0].getGenericType();
+            } else if (field != null) {
+                return field.getGenericType();
+            } else if (creatorParameter != null) {
+                return creatorParameter.getGenericType();
+            } else {
+                throw new AssertionError("Cannot determine type, this property should have been filtered out during introspection");
+            }
+        }
+
+        static Property field(String name, FieldElement field) {
+            Objects.requireNonNull(field, "field");
+            return new Property(name, field, null, null, null);
+        }
+
+        static Property getter(String name, MethodElement getter) {
+            Objects.requireNonNull(getter, "getter");
+            return new Property(name, null, getter, null, null);
+        }
+
+        static Property setter(String name, MethodElement setter) {
+            Objects.requireNonNull(setter, "setter");
+            return new Property(name, null, null, setter, null);
+        }
+
+        static Property creatorParameter(String name, ParameterElement creatorParameter) {
+            Objects.requireNonNull(creatorParameter, "creatorParameter");
+            return new Property(name, null, null, null, creatorParameter);
         }
     }
 }

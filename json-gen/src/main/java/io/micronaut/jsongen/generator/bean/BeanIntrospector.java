@@ -31,33 +31,35 @@ class BeanIntrospector {
         Scanner scanner = new Scanner(forSerialization);
         scanner.scan(clazz);
         BeanDefinition beanDefinition = new BeanDefinition();
-        // note: this map is *not* in the right order anymore! (not a LinkedHashMap)
-        Map<Property, BeanDefinition.Property> completeProps = scanner.byName.values().stream().collect(Collectors.toMap(
-                prop -> prop,
-                prop -> {
-                    prop.trimInaccessible(forSerialization);
-
-                    BeanDefinition.Property tgt = new BeanDefinition.Property(prop.name);
-                    if (prop.getter != null) {
-                        tgt.getter = prop.getter.accessor;
-                    }
-                    if (prop.setter != null) {
-                        tgt.setter = prop.setter.accessor;
-                    }
-                    if (prop.field != null) {
-                        tgt.field = prop.field.accessor;
-                    }
-                    if (prop.creatorParameter != null) {
-                        tgt.creatorParameter = prop.creatorParameter;
-                    }
-                    return tgt;
+        Map<Property, BeanDefinition.Property> completeProps = new LinkedHashMap<>();
+        for (Property prop : scanner.byName.values()) {
+            // remove hidden accessors
+            prop.trimInaccessible(forSerialization);
+            // filter out properties based on whether they're read/write-only
+            if (!prop.shouldInclude(forSerialization)) {
+                continue;
+            }
+            BeanDefinition.Property finished;
+            if (forSerialization) {
+                if (prop.getter != null) {
+                    finished = BeanDefinition.Property.getter(prop.name, prop.getter.accessor);
+                } else {
+                    assert prop.field != null;
+                    finished = BeanDefinition.Property.field(prop.name, prop.field.accessor);
                 }
-        ));
-        // filter out properties based on whether they're read/write-only
-        beanDefinition.props = scanner.byName.values().stream()
-                .filter(e -> e.shouldInclude(forSerialization))
-                .map(completeProps::get)
-                .collect(Collectors.toList());
+            } else {
+                if (prop.creatorParameter != null) {
+                    finished = BeanDefinition.Property.creatorParameter(prop.name, prop.creatorParameter);
+                } else if (prop.setter != null) {
+                    finished = BeanDefinition.Property.setter(prop.name, prop.setter.accessor);
+                } else {
+                    assert prop.field != null;
+                    finished = BeanDefinition.Property.field(prop.name, prop.field.accessor);
+                }
+            }
+            completeProps.put(prop, finished);
+        }
+        beanDefinition.props = new ArrayList<>(completeProps.values());
         if (scanner.creator == null) {
             if (scanner.defaultConstructor == null) {
                 throw new UnsupportedOperationException("Missing default constructor or @JsonCreator");
