@@ -21,10 +21,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.jsongen.JsonParseException;
-import io.micronaut.jsongen.generator.GeneratorContext;
-import io.micronaut.jsongen.generator.PoetUtil;
-import io.micronaut.jsongen.generator.SerializerLinker;
-import io.micronaut.jsongen.generator.SerializerSymbol;
+import io.micronaut.jsongen.generator.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -53,7 +50,13 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         // have to check both ser/deser, in case property types differ (e.g. when setters and getters have different types)
         // technically, this could lead to false positives for checking, since ser types will be considered in a subgraph that is only reachable through deser
         for (boolean ser : new boolean[] {true, false}) {
-            for (BeanDefinition.Property prop : BeanIntrospector.introspect(type, ser).props) {
+            ProblemReporter problemReporter = new ProblemReporter();
+            BeanDefinition definition = BeanIntrospector.introspect(problemReporter, type, ser);
+            if (problemReporter.isFailed()) {
+                // definition may be in an invalid state. The actual errors will be reported by the codegen, so just skip here
+                continue;
+            }
+            for (BeanDefinition.Property prop : definition.props) {
                 SerializerSymbol symbol = linker.findSymbol(prop.getType());
                 if (prop.permitRecursiveSerialization) {
                     symbol = symbol.withRecursiveSerialization();
@@ -73,7 +76,11 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
-        BeanDefinition definition = BeanIntrospector.introspect(type, true);
+        BeanDefinition definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, true);
+        if (generatorContext.getProblemReporter().isFailed()) {
+            // definition may be in an invalid state, so just skip codegen
+            return CodeBlock.of("");
+        }
 
         String objectVarName = generatorContext.newLocalVariable("object");
 
@@ -137,13 +144,18 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             this.generatorContext = generatorContext;
             this.type = type;
 
-            definition = BeanIntrospector.introspect(type, false);
+            definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, false);
             localVariableNames = definition.props.stream()
                     .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
             duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, definition.props);
         }
 
         private DeserializationCode generate() {
+            // if there were failures, the definition may be in an inconsistent state, so we avoid codegen.
+            if (generatorContext.getProblemReporter().isFailed()) {
+                return new DeserializationCode(CodeBlock.of(""));
+            }
+
             deserialize.add("if ($N.getCurrentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
                     DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
 

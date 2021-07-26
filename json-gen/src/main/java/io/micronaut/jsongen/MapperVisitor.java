@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.jsongen.generator.ProblemReporter;
 import io.micronaut.jsongen.generator.SerializerLinker;
 import io.micronaut.jsongen.generator.SingletonSerializerGenerator;
 import io.micronaut.jsongen.generator.bean.DependencyGraphChecker;
@@ -41,7 +42,13 @@ public class MapperVisitor implements TypeElementVisitor<SerializableBean, Seria
         if (depChecker.hasAnyFailures()) {
             return;
         }
-        SingletonSerializerGenerator.GenerationResult generationResult = SingletonSerializerGenerator.generate(element, inlineBeanSerializer);
+        ProblemReporter problemReporter = new ProblemReporter();
+        SingletonSerializerGenerator.GenerationResult generationResult = SingletonSerializerGenerator.generate(problemReporter, element, inlineBeanSerializer);
+
+        problemReporter.reportTo(context);
+        if (problemReporter.isFailed()) {
+            return;
+        }
 
         // todo: gen serviceloader
         // todo: support groovy/kt

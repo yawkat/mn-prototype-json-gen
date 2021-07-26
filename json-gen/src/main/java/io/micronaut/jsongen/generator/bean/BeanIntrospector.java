@@ -24,13 +24,14 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.*;
 import io.micronaut.jsongen.RecursiveSerialization;
+import io.micronaut.jsongen.generator.ProblemReporter;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 class BeanIntrospector {
-    public static BeanDefinition introspect(ClassElement clazz, boolean forSerialization) {
-        Scanner scanner = new Scanner(forSerialization);
+    public static BeanDefinition introspect(ProblemReporter problemReporter, ClassElement clazz, boolean forSerialization) {
+        Scanner scanner = new Scanner(problemReporter, forSerialization);
         scanner.scan(clazz);
         BeanDefinition beanDefinition = new BeanDefinition();
         Map<PropBuilder, BeanDefinition.Property> completeProps = new LinkedHashMap<>();
@@ -65,7 +66,7 @@ class BeanIntrospector {
         beanDefinition.props = new ArrayList<>(completeProps.values());
         if (scanner.creator == null) {
             if (scanner.defaultConstructor == null) {
-                throw new UnsupportedOperationException("Missing default constructor or @JsonCreator");
+                problemReporter.fail("Missing default constructor or @JsonCreator", clazz);
             }
 
             // use the default constructor as an "empty creator"
@@ -107,6 +108,7 @@ class BeanIntrospector {
      * mostly follows jackson-jr AnnotationBasedIntrospector.
      */
     private static class Scanner {
+        final ProblemReporter problemReporter;
         final boolean forSerialization;
 
         final Map<String, PropBuilder> byImplicitName = new LinkedHashMap<>();
@@ -119,7 +121,8 @@ class BeanIntrospector {
 
         boolean ignoreUnknownProperties;
 
-        Scanner(boolean forSerialization) {
+        Scanner(ProblemReporter problemReporter, boolean forSerialization) {
+            this.problemReporter = problemReporter;
             this.forSerialization = forSerialization;
         }
 
@@ -297,27 +300,32 @@ class BeanIntrospector {
 
             // do this check after checking the mode so that DISABLED creators don't lead to an error
             if (!method.isStatic() && !(method instanceof ConstructorElement)) {
-                throw new UnsupportedOperationException("@JsonCreator annotation cannot be placed on instance methods");
+                problemReporter.fail("@JsonCreator annotation cannot be placed on instance methods", method);
+                return;
             }
 
             if (delegating) {
                 // todo
-                throw new UnsupportedOperationException("Delegating creator not yet supported");
+                problemReporter.fail("Delegating creator not yet supported", method);
             } else {
                 if (creator != null) {
-                    throw new UnsupportedOperationException("Multiple creators configured");
+                    problemReporter.fail("Multiple creators configured", method);
                 }
                 creator = method;
                 creatorProps = new ArrayList<>();
                 for (ParameterElement parameter : parameters) {
                     AnnotationValue<JsonProperty> propertyAnnotation = parameter.getAnnotation(JsonProperty.class);
                     if (propertyAnnotation == null) {
-                        throw new UnsupportedOperationException("All parameters of a @JsonCreator must be annotated with a @JsonProperty");
+                        problemReporter.fail("All parameters of a @JsonCreator must be annotated with a @JsonProperty", parameter);
+                        continue;
                     }
-                    String propName = propertyAnnotation.getValue(String.class)
+                    Optional<String> propName = propertyAnnotation.getValue(String.class);
                             // we allow empty property names here, as long as they're explicitly defined.
-                            .orElseThrow(() -> new UnsupportedOperationException("@JsonProperty name cannot be missing on a creator"));
-                    PropBuilder prop = getByName(propName);
+                    if (!propName.isPresent()) {
+                        problemReporter.fail("@JsonProperty name cannot be missing on a creator", parameter);
+                        continue;
+                    }
+                    PropBuilder prop = getByName(propName.get());
                     prop.creatorParameter = parameter;
                     creatorProps.add(prop);
                 }

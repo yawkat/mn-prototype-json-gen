@@ -21,6 +21,8 @@ import com.squareup.javapoet.TypeName;
 import java.util.*;
 
 public final class GeneratorContext {
+    private final ProblemReporter problemReporter;
+
     /**
      * A readable path to this context, used for better error messages.
      */
@@ -32,18 +34,19 @@ public final class GeneratorContext {
     private final Map<TypeName, Injected> injected;
 
     private GeneratorContext(
-            String readablePath,
+            ProblemReporter problemReporter, String readablePath,
             IdentifierScope fields,
             IdentifierScope localVariables,
             Map<TypeName, Injected> injected) {
+        this.problemReporter = problemReporter;
         this.readablePath = readablePath;
         this.fields = fields;
         this.localVariables = localVariables;
         this.injected = injected;
     }
 
-    static GeneratorContext create(String rootReadablePath) {
-        return new GeneratorContext(rootReadablePath, new IdentifierScope(), null, new HashMap<>());
+    static GeneratorContext create(ProblemReporter problemReporter, String rootReadablePath) {
+        return new GeneratorContext(problemReporter, rootReadablePath, new IdentifierScope(), null, new HashMap<>());
     }
 
     public String getReadablePath() {
@@ -52,14 +55,14 @@ public final class GeneratorContext {
 
     public GeneratorContext withSubPath(String element) {
         // the other variables are mutable, so we can just reuse them
-        return new GeneratorContext(readablePath + "->" + element, fields, localVariables, injected);
+        return new GeneratorContext(problemReporter, readablePath + "->" + element, fields, localVariables, injected);
     }
 
     public GeneratorContext newMethodContext(String... usedLocals) {
         if (this.localVariables != null) {
             throw new IllegalStateException("Nesting of local variable scopes not supported");
         }
-        return new GeneratorContext(readablePath, fields, new IdentifierScope(usedLocals), injected);
+        return new GeneratorContext(problemReporter, readablePath, fields, new IdentifierScope(usedLocals), injected);
     }
 
     /**
@@ -81,6 +84,10 @@ public final class GeneratorContext {
 
     public Map<TypeName, Injected> getInjected() {
         return injected;
+    }
+
+    public ProblemReporter getProblemReporter() {
+        return problemReporter;
     }
 
     public static final class Injected {

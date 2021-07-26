@@ -33,8 +33,9 @@ public final class SingletonSerializerGenerator {
     private SingletonSerializerGenerator() {
     }
 
-    public static GenerationResult generate(ClassElement clazz, SerializerSymbol symbol) {
+    public static GenerationResult generate(ProblemReporter problemReporter, ClassElement clazz, SerializerSymbol symbol) {
         return generate(
+                problemReporter,
                 ClassName.get(clazz.getPackageName(), clazz.getSimpleName() + "$Serializer"),
                 PoetUtil.toTypeName(clazz),
                 symbol,
@@ -50,12 +51,13 @@ public final class SingletonSerializerGenerator {
      * @return The generated serializer class
      */
     static GenerationResult generate(
+            ProblemReporter problemReporter,
             ClassName serializerName,
             TypeName valueName,
             SerializerSymbol symbol,
             ClassElement valueType
     ) {
-        GeneratorContext classContext = GeneratorContext.create(valueName.toString());
+        GeneratorContext classContext = GeneratorContext.create(problemReporter, valueName.toString());
 
         SerializerSymbol.DeserializationCode deserializationCode = symbol.deserialize(classContext.newMethodContext(DECODER), valueType);
         MethodSpec deserialize = MethodSpec.methodBuilder("deserialize")
