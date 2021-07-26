@@ -174,4 +174,23 @@ class B {
         e.message.contains("Circular dependency")
         e.message.contains("A->b->*->a->*")
     }
+
+    void "recursive ref to type with dedicated serializer doesn't error"() {
+        // todo: this is sensible behavior since the user may decide to supply her own Serializer<B>, but is it intuitive?
+        when:
+        buildClassLoader('example.A', '''
+package example;
+
+@io.micronaut.jsongen.SerializableBean
+class A {
+    B b;
+}
+// not annotated
+class B {
+    A a;
+}
+''')
+        then:
+        return
+    }
 }

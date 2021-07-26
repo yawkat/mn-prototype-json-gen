@@ -4,10 +4,12 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.jsongen.SerializableBean;
 import io.micronaut.jsongen.generator.SerializerLinker;
 import io.micronaut.jsongen.generator.SerializerSymbol;
 
 import java.util.Map;
+import java.util.Optional;
 
 public class DependencyGraphChecker {
     private final VisitorContext warningContext;
@@ -109,9 +111,15 @@ public class DependencyGraphChecker {
                 return;
             }
 
-            // if (dependencyType.isAnnotationPresent(SerializableBean.class)) { todo: this doesn't seem to work
-            visitChild(new InlineBeanSerializerSymbol(linker), dependencyType, null);
-            // } // else, a custom serializer.
+            Optional<ClassElement> classDecl = warningContext.getClassElement(dependencyType.getName());
+            if (!classDecl.isPresent()) {
+                // just ignore the type, nothing we can do.
+                return;
+            }
+
+            if (classDecl.get().isAnnotationPresent(SerializableBean.class)) {
+                visitChild(new InlineBeanSerializerSymbol(linker), dependencyType, null);
+            } // else, a custom serializer.
         }
 
         private void visitChild(SerializerSymbol childSymbol, ClassElement dependencyType, Element element) {
