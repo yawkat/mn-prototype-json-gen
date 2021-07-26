@@ -4,7 +4,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.jsongen.SerializableBean;
 import io.micronaut.jsongen.generator.SerializerLinker;
 import io.micronaut.jsongen.generator.SerializerSymbol;
 
@@ -48,19 +47,13 @@ public class DependencyGraphChecker {
     }
 
     private class Node implements SerializerSymbol.DependencyVisitor {
-        /*
-         * This logic is a bit intricate. When bean properties are visited, visitInline is called. When an inject
-         * *symbol* is visited, visitInject is called.
-         *
-         * We cannot fail on every property that has an ancestor of the same type, because it might still be fine if the
-         * symbol for the property goes through a provider. So what we do instead is create a new node for the property,
-         * and only check for the circular dependency when a member of that property is visited. If that member is
-         * visitInject, we can still ignore the circular dependency.
-         */
-
+        @Nullable
         private final Node parent;
         private final ClassElement type;
+        @Nullable
         private final Element debugElement;
+
+        private boolean isStructureNode;
 
         Node(Node parent, ClassElement type, Element debugElement) {
             this.parent = parent;
@@ -68,27 +61,44 @@ public class DependencyGraphChecker {
             this.debugElement = debugElement;
         }
 
-        private boolean hasAncestorType(ClassElement type) {
-            return parent != null && (isSameType(parent.type, type) || parent.hasAncestorType(type));
-        }
-
         private boolean checkParent() {
-            if (hasAncestorType(type)) {
-                // todo: better message
-                warningContext.fail("Circular dependency", debugElement);
-                anyFailures = true;
-                return false;
-            } else {
+            Node node = parent;
+            while (node != null) {
+                if (node.isStructureNode && isSameType(node.type, this.type)) {
+                    // found a cycle!
+                    break;
+                }
+                node = node.parent;
+            }
+            if (node == null) {
+                // no cycle
                 return true;
             }
+            // `node` has the same type as us, now.
+            // walk up the path again, up to the parent with the cycle.
+            StringBuilder pathBuilder = new StringBuilder(debugElement == null ? "*" : debugElement.getSimpleName());
+            Node pathNode = this;
+            while (pathNode != node) {
+                pathNode = pathNode.parent;
+                assert pathNode != null;
+                String elementName = pathNode.debugElement == null ? "*" : pathNode.debugElement.getSimpleName();
+                // prepend the node
+                pathBuilder.insert(0, elementName + "->");
+            }
+
+            warningContext.fail("Circular dependency: " + pathBuilder, debugElement);
+            anyFailures = true;
+            return false;
         }
 
         @Override
-        public void visitInline(SerializerSymbol dependencySymbol, ClassElement dependencyType, @Nullable Element element) {
-            if (!checkParent()) {
-                return;
-            }
+        public boolean visitStructure() {
+            isStructureNode = true;
+            return checkParent();
+        }
 
+        @Override
+        public void visitStructureElement(SerializerSymbol dependencySymbol, ClassElement dependencyType, @Nullable Element element) {
             visitChild(dependencySymbol, dependencyType, element);
         }
 
@@ -98,17 +108,14 @@ public class DependencyGraphChecker {
                 // we don't care about recursion if it goes through a provider
                 return;
             }
-            if (!checkParent()) {
-                return;
-            }
 
-            if (dependencyType.isAnnotationPresent(SerializableBean.class)) {
-                visitChild(new InlineBeanSerializerSymbol(linker), dependencyType, null);
-            } // else, a custom serializer.
+            // if (dependencyType.isAnnotationPresent(SerializableBean.class)) { todo: this doesn't seem to work
+            visitChild(new InlineBeanSerializerSymbol(linker), dependencyType, null);
+            // } // else, a custom serializer.
         }
 
         private void visitChild(SerializerSymbol childSymbol, ClassElement dependencyType, Element element) {
-            Node childNode = new Node(this, dependencyType, element == null ? debugElement : element);
+            Node childNode = new Node(this, dependencyType, element);
             childSymbol.visitDependencies(childNode, dependencyType);
         }
     }

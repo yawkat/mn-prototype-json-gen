@@ -47,6 +47,9 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public void visitDependencies(DependencyVisitor visitor, ClassElement type) {
+        if (!visitor.visitStructure()) {
+            return;
+        }
         // have to check both ser/deser, in case property types differ (e.g. when setters and getters have different types)
         // technically, this could lead to false positives for checking, since ser types will be considered in a subgraph that is only reachable through deser
         for (boolean ser : new boolean[] {true, false}) {
@@ -55,7 +58,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 if (prop.permitRecursiveSerialization) {
                     symbol = symbol.withRecursiveSerialization();
                 }
-                visitor.visitInline(symbol, prop.getType(), prop.getElement());
+                visitor.visitStructureElement(symbol, prop.getType(), prop.getElement());
             }
         }
     }

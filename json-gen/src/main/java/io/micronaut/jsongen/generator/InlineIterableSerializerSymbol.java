@@ -42,8 +42,10 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
 
     @Override
     public void visitDependencies(DependencyVisitor visitor, ClassElement type) {
-        ClassElement elementType = getElementType(type);
-        visitor.visitInline(linker.findSymbol(elementType), elementType, null);
+        if (visitor.visitStructure()) {
+            ClassElement elementType = getElementType(type);
+            visitor.visitStructureElement(linker.findSymbol(elementType), elementType, null);
+        }
     }
 
     @Override

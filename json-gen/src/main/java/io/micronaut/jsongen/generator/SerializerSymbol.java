@@ -84,7 +84,12 @@ public interface SerializerSymbol {
     }
 
     interface DependencyVisitor {
-        void visitInline(SerializerSymbol dependencySymbol, ClassElement dependencyType, @Nullable Element element);
+        /**
+         * @return Whether to visit the elements of this structure
+         */
+        boolean visitStructure();
+
+        void visitStructureElement(SerializerSymbol dependencySymbol, ClassElement dependencyType, @Nullable Element element);
 
         void visitInjected(ClassElement dependencyType, boolean provider);
     }
