@@ -17,6 +17,7 @@ package io.micronaut.jsongen.generator.bean;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -74,6 +75,7 @@ class BeanIntrospector {
             beanDefinition.creator = scanner.creator;
             beanDefinition.creatorProps = scanner.creatorProps.stream().map(completeProps::get).collect(Collectors.toList());
         }
+        beanDefinition.ignoreUnknownProperties = scanner.ignoreUnknownProperties;
         return beanDefinition;
     }
 
@@ -114,6 +116,8 @@ class BeanIntrospector {
 
         MethodElement creator = null;
         List<PropBuilder> creatorProps;
+
+        boolean ignoreUnknownProperties;
 
         Scanner(boolean forSerialization) {
             this.forSerialization = forSerialization;
@@ -166,6 +170,11 @@ class BeanIntrospector {
         }
 
         void scan(ClassElement clazz) {
+            AnnotationValue<JsonIgnoreProperties> jsonIgnoreProperties = clazz.getAnnotation(JsonIgnoreProperties.class);
+            if (jsonIgnoreProperties != null) {
+                ignoreUnknownProperties = jsonIgnoreProperties.get("ignoreUnknown", Boolean.class).orElse(false);
+            }
+
             // todo: check we don't have another candidate when replacing properties of the definition
 
             // note: clazz may be a superclass of our original class. in that case, the defaultConstructor will be overwritten.

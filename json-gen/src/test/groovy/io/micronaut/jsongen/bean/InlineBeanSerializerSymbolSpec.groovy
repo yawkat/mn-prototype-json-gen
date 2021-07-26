@@ -306,4 +306,40 @@ class Test {
         // with the right message please
         e.message.contains("v14")
     }
+
+    void "unknown properties lead to error"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.*;
+class Test {
+    String foo;
+}
+''')
+
+        when:
+        deserializeFromString(compiled.serializer, '{"foo": "1", "bar": "2"}')
+
+        then:
+        thrown JsonParseException
+    }
+
+    void "unknown properties with proper annotation"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.*;
+@JsonIgnoreProperties(ignoreUnknown = true)
+class Test {
+    String foo;
+}
+''')
+
+        def des = deserializeFromString(compiled.serializer, '{"foo": "1", "bar": "2"}')
+
+        expect:
+        des.foo == "1"
+    }
 }

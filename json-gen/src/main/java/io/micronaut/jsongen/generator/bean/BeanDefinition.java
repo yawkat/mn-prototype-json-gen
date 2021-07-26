@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Objects;
 
 class BeanDefinition {
+    boolean ignoreUnknownProperties;
+
     MethodElement creator;
     List<Property> creatorProps;
 
