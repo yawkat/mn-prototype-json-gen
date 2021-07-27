@@ -16,9 +16,11 @@
 package io.micronaut.jsongen.generator;
 
 import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.NameAllocator;
 import com.squareup.javapoet.TypeName;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class GeneratorContext {
     private final ProblemReporter problemReporter;
@@ -28,15 +30,15 @@ public final class GeneratorContext {
      */
     private final String readablePath;
 
-    private final IdentifierScope fields;
-    private final IdentifierScope localVariables;
+    private final NameAllocator fields;
+    private final NameAllocator localVariables;
 
     private final Map<TypeName, Injected> injected;
 
     private GeneratorContext(
             ProblemReporter problemReporter, String readablePath,
-            IdentifierScope fields,
-            IdentifierScope localVariables,
+            NameAllocator fields,
+            NameAllocator localVariables,
             Map<TypeName, Injected> injected) {
         this.problemReporter = problemReporter;
         this.readablePath = readablePath;
@@ -46,7 +48,7 @@ public final class GeneratorContext {
     }
 
     static GeneratorContext create(ProblemReporter problemReporter, String rootReadablePath) {
-        return new GeneratorContext(problemReporter, rootReadablePath, new IdentifierScope(), null, new HashMap<>());
+        return new GeneratorContext(problemReporter, rootReadablePath, new NameAllocator(), null, new HashMap<>());
     }
 
     public String getReadablePath() {
@@ -62,7 +64,15 @@ public final class GeneratorContext {
         if (this.localVariables != null) {
             throw new IllegalStateException("Nesting of local variable scopes not supported");
         }
-        return new GeneratorContext(problemReporter, readablePath, fields, new IdentifierScope(usedLocals), injected);
+        NameAllocator localVariables = new NameAllocator();
+        for (String usedLocal : usedLocals) {
+            String actual = localVariables.newName(usedLocal);
+            // usually, newName will return the same name, unless there's a collision or something invalid.
+            if (!actual.equals(usedLocal)) {
+                throw new IllegalArgumentException("Duplicate or illegal local variable name: " + usedLocal);
+            }
+        }
+        return new GeneratorContext(problemReporter, readablePath, fields, localVariables, injected);
     }
 
     /**
@@ -72,12 +82,12 @@ public final class GeneratorContext {
      * @return The unique generated variable name
      */
     public String newLocalVariable(String nameHint) {
-        return localVariables.create(nameHint);
+        return localVariables.newName(nameHint);
     }
 
     public Injected requestInjection(TypeName type) {
         return injected.computeIfAbsent(type, t -> {
-            String fieldName = fields.create(t.toString());
+            String fieldName = fields.newName(t.toString());
             return new Injected(fieldName);
         });
     }
@@ -102,28 +112,6 @@ public final class GeneratorContext {
 
         public CodeBlock getAccessExpression() {
             return accessExpression;
-        }
-    }
-
-    private static class IdentifierScope {
-        private final Set<String> identifiers;
-
-        public IdentifierScope(String... predefined) {
-            identifiers = new HashSet<>(Arrays.asList(predefined));
-        }
-
-        String create(String nameHint) {
-            // todo: handle reserved identifiers
-            String sane = nameHint.replaceAll("[^a-zA-Z0-9]", "_");
-            if (identifiers.add(sane)) {
-                return sane;
-            }
-            for (int i = 0; ; i++) {
-                String withSuffix = sane + "$" + i;
-                if (identifiers.add(withSuffix)) {
-                    return withSuffix;
-                }
-            }
         }
     }
 }
