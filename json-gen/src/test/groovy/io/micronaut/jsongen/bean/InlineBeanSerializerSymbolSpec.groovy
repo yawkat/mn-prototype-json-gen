@@ -85,6 +85,35 @@ class Test {
         serialized == '{"foo":"42"}'
     }
 
+    void "JsonProperty on is-getter"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+class Test {
+    private boolean bar;
+    
+    @JsonProperty("foo")
+    public boolean isBar() {
+        return bar;
+    }
+    
+    public void setBar(boolean bar) {
+        this.bar = bar;
+    }
+}
+''')
+        def deserialized = deserializeFromString(compiled.serializer, '{"foo": true}')
+        def testBean = compiled.newInstance()
+        testBean.bar = true
+        def serialized = serializeToString(compiled.serializer, testBean)
+
+        expect:
+        deserialized.bar == true
+        serialized == '{"foo":true}'
+    }
+
     void "JsonProperty on accessors without prefix"() {
         given:
         def compiled = buildSerializer('''

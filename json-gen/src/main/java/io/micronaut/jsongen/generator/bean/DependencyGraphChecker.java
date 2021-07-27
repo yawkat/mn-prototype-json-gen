@@ -8,7 +8,6 @@ import io.micronaut.jsongen.SerializableBean;
 import io.micronaut.jsongen.generator.SerializerLinker;
 import io.micronaut.jsongen.generator.SerializerSymbol;
 
-import java.util.Map;
 import java.util.Optional;
 
 public class DependencyGraphChecker {
@@ -30,24 +29,6 @@ public class DependencyGraphChecker {
         return anyFailures;
     }
 
-    private static boolean isSameType(ClassElement a, ClassElement b) {
-        // todo: mn3 .equals
-        if (!a.getName().equals(b.getName())) {
-            return false;
-        }
-        Map<String, ClassElement> aArgs = a.getTypeArguments();
-        Map<String, ClassElement> bArgs = b.getTypeArguments();
-        if (!aArgs.keySet().equals(bArgs.keySet())) {
-            return false;
-        }
-        for (String argument : aArgs.keySet()) {
-            if (!isSameType(aArgs.get(argument), bArgs.get(argument))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private class Node implements SerializerSymbol.DependencyVisitor {
         @Nullable
         private final Node parent;
@@ -66,7 +47,7 @@ public class DependencyGraphChecker {
         private boolean checkParent() {
             Node node = parent;
             while (node != null) {
-                if (node.isStructureNode && isSameType(node.type, this.type)) {
+                if (node.isStructureNode && ElementUtil.equals(node.type, this.type)) {
                     // found a cycle!
                     break;
                 }

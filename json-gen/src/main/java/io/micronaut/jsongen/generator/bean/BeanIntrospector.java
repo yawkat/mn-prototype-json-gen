@@ -89,21 +89,6 @@ class BeanIntrospector {
         return null;
     }
 
-    private static String decapitalize(String s) {
-        if (s.isEmpty()) {
-            return "";
-        }
-
-        char firstChar = s.charAt(0);
-        if (Character.isLowerCase(firstChar)) {
-            return s;
-        }
-
-        // todo: abbreviations at start of string
-
-        return Character.toLowerCase(firstChar) + s.substring(1);
-    }
-
     /**
      * mostly follows jackson-jr AnnotationBasedIntrospector.
      */
@@ -183,59 +168,46 @@ class BeanIntrospector {
             // note: clazz may be a superclass of our original class. in that case, the defaultConstructor will be overwritten.
             defaultConstructor = clazz.getDefaultConstructor().orElse(null);
 
-            for (FieldElement field : clazz.getFields()) {
-                if (field.isStatic()) {
-                    continue;
-                }
-
+            for (FieldElement field : clazz.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyInstance())) {
                 PropBuilder prop = getByImplicitName(field.getName());
                 prop.field = makeAccessor(field, field.getName());
             }
 
-            for (MethodElement method : clazz.getEnclosedElements(ElementQuery.ALL_METHODS)) {
-                if (method.isStatic()) {
+            // used to avoid visiting a method twice, once in bean properties and once in the normal pass
+            // todo: find a better solution
+            Set<MethodElementWrapper> visitedMethods = new HashSet<>();
+
+            for (PropertyElement beanProperty : clazz.getBeanProperties()) {
+                String implicitName = beanProperty.getName();
+                PropBuilder prop = getByImplicitName(implicitName);
+                beanProperty.getReadMethod().ifPresent(readMethod -> {
+                    visitedMethods.add(new MethodElementWrapper(readMethod));
+                    prop.getter = makeAccessor(readMethod, implicitName);
+                });
+                beanProperty.getWriteMethod().ifPresent(writeMethod -> {
+                    visitedMethods.add(new MethodElementWrapper(writeMethod));
+                    prop.setter = makeAccessor(writeMethod, implicitName);
+                });
+            }
+
+            for (MethodElement method : clazz.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
+                if (!visitedMethods.add(new MethodElementWrapper(method))) {
+                    // skip methods we already visited for properties
                     continue;
                 }
 
-                String rawName = method.getName();
+                // if we have an explicit @JsonProperty, fall back to just the method name as the implicit name
                 if (method.getParameters().length == 0) {
                     // getter
-                    String implicitName = null;
-                    // TODO: reuse bean method detection
-                    if (rawName.startsWith("get") && rawName.length() > 3) {
-                        implicitName = decapitalize(rawName.substring(3));
-                    } else if (rawName.startsWith("is") && rawName.length() > 2) {
-                        implicitName = decapitalize(rawName.substring(2));
-                    }
-
-                    if (implicitName != null) {
-                        PropBuilder prop = getByImplicitName(implicitName);
-                        prop.getter = makeAccessor(method, implicitName);
-                    } else {
-                        if (getExplicitName(method) != null) {
-                            // if we have an explicit @JsonProperty, fall back to just the method name as the implicit name
-                            PropBuilder prop = getByImplicitName(method.getName());
-                            prop.getter = makeAccessor(method, method.getName());
-                        }
+                    if (getExplicitName(method) != null) {
+                        PropBuilder prop = getByImplicitName(method.getName());
+                        prop.getter = makeAccessor(method, method.getName());
                     }
                 } else if (method.getParameters().length == 1) {
                     // setter
-                    String implicitName;
-                    if (rawName.startsWith("set") && rawName.length() > 3) {
-                        implicitName = decapitalize(rawName.substring(3));
-                    } else {
-                        implicitName = null;
-                    }
-
-                    if (implicitName != null) {
-                        PropBuilder prop = getByImplicitName(implicitName);
-                        prop.setter = makeAccessor(method, implicitName);
-                    } else {
-                        if (getExplicitName(method) != null) {
-                            // if we have an explicit @JsonProperty, fall back to just the method name as the implicit name
-                            PropBuilder prop = getByImplicitName(method.getName());
-                            prop.setter = makeAccessor(method, method.getName());
-                        }
+                    if (getExplicitName(method) != null) {
+                        PropBuilder prop = getByImplicitName(method.getName());
+                        prop.setter = makeAccessor(method, method.getName());
                     }
                 }
             }
@@ -320,7 +292,7 @@ class BeanIntrospector {
                         continue;
                     }
                     Optional<String> propName = propertyAnnotation.getValue(String.class);
-                            // we allow empty property names here, as long as they're explicitly defined.
+                    // we allow empty property names here, as long as they're explicitly defined.
                     if (!propName.isPresent()) {
                         problemReporter.fail("@JsonProperty name cannot be missing on a creator", parameter);
                         continue;
@@ -404,5 +376,24 @@ class BeanIntrospector {
          * {@literal @}{@link JsonProperty} with name.
          */
         EXPLICIT,
+    }
+
+    private static class MethodElementWrapper {
+        private final MethodElement element;
+
+        MethodElementWrapper(MethodElement element) {
+            this.element = element;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof MethodElementWrapper && ElementUtil.equals(element, ((MethodElementWrapper) o).element);
+        }
+
+        @Override
+        public int hashCode() {
+            // should be fine
+            return element.getName().hashCode();
+        }
     }
 }
