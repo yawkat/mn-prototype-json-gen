@@ -237,7 +237,6 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             if (definition.creator instanceof ConstructorElement) {
                 deserialize.addStatement("$T $N = new $T($L)", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(type), creatorParameters.build());
             } else if (definition.creator.isStatic()) {
-                // TODO edge cases?
                 deserialize.addStatement(
                         "$T $N = $T.$N($L)",
                         PoetUtil.toTypeName(type),
