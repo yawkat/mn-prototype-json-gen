@@ -104,6 +104,9 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         if (prop.permitRecursiveSerialization) {
             symbol = symbol.withRecursiveSerialization();
         }
+        if (prop.nullable) {
+            symbol = new NullableSerializerSymbol(symbol);
+        }
         return symbol;
     }
 
@@ -189,7 +192,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 return new DeserializationCode(CodeBlock.of(""));
             }
 
-            deserialize.add("if ($N.getCurrentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
+            deserialize.add("if ($N.currentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
                     DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
 
             duplicatePropertyManager.emitMaskDeclarations(deserialize);

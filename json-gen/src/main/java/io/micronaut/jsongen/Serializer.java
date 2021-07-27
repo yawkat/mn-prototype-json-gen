@@ -24,7 +24,7 @@ public interface Serializer<T> {
     /**
      * Deserialize from the given {@code decoder}.
      * <p>
-     * The decoder {@link JsonParser#getCurrentToken()} should be positioned at the first token of this value.
+     * The decoder {@link JsonParser#currentToken()} should be positioned at the first token of this value.
      *
      * @param decoder The decoder to parse from
      * @return The decoded value

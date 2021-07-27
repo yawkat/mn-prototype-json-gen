@@ -7,7 +7,6 @@ import io.micronaut.jsongen.SerializerUtils
 import io.micronaut.jsongen.generator.ProblemReporter
 import io.micronaut.jsongen.generator.SerializerLinker
 import io.micronaut.jsongen.generator.SingletonSerializerGenerator
-import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol
 import org.intellij.lang.annotations.Language
 
 import javax.tools.JavaFileObject
@@ -22,7 +21,7 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
 
         def linker = new SerializerLinker(null)
         def problemReporter = new ProblemReporter()
-        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(problemReporter, classElement, new InlineBeanSerializerSymbol(linker, typeResolutionContext));
+        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(problemReporter, classElement, linker.inlineBean);
         problemReporter.throwOnFailures()
         def files = newJavaParser().generate(
                 new StringSourceJavaFileObject(classElement.name, cls),

@@ -28,6 +28,7 @@ import io.micronaut.jsongen.generator.ProblemReporter;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 class BeanIntrospector {
     /**
@@ -68,6 +69,7 @@ class BeanIntrospector {
                 }
             }
             built = built.withPermitRecursiveSerialization(prop.permitRecursiveSerialization);
+            built = built.withNullable(prop.nullable);
             completeProps.put(prop, built);
         }
         beanDefinition.props = new ArrayList<>(completeProps.values());
@@ -85,15 +87,6 @@ class BeanIntrospector {
         }
         beanDefinition.ignoreUnknownProperties = scanner.ignoreUnknownProperties;
         return beanDefinition;
-    }
-
-    private static String firstExplicitName(Accessor<?>... accessors) {
-        for (Accessor<?> accessor : accessors) {
-            if (accessor != null && accessor.type == AccessorType.EXPLICIT) {
-                return accessor.name;
-            }
-        }
-        return null;
     }
 
     /**
@@ -222,7 +215,11 @@ class BeanIntrospector {
             byName = new LinkedHashMap<>();
             for (Map.Entry<String, PropBuilder> entry : byImplicitName.entrySet()) {
                 PropBuilder prop = entry.getValue();
-                String explicitName = forSerialization ? firstExplicitName(prop.getter, prop.setter, prop.field) : firstExplicitName(prop.setter, prop.getter, prop.field);
+                String explicitName = prop.accessorsInOrder(forSerialization)
+                        .filter(acc -> acc.type == AccessorType.EXPLICIT)
+                        .findFirst()
+                        .map(acc -> acc.name)
+                        .orElse(null);
                 prop.name = explicitName == null ? entry.getKey() : explicitName;
                 byName.put(prop.name, prop);
             }
@@ -234,23 +231,24 @@ class BeanIntrospector {
                 handleCreator(constructor);
             }
 
-            // if there's a @RecursiveSerialization on *any* of the involved elements, mark the property for recursive ser
             for (PropBuilder prop : byName.values()) {
-                if (prop.field != null && prop.field.accessor.hasAnnotation(RecursiveSerialization.class)) {
-                    prop.permitRecursiveSerialization = true;
-                    continue;
-                }
-                if (prop.setter != null && prop.setter.accessor.hasAnnotation(RecursiveSerialization.class)) {
-                    prop.permitRecursiveSerialization = true;
-                    continue;
-                }
-                if (prop.getter != null && prop.getter.accessor.hasAnnotation(RecursiveSerialization.class)) {
-                    prop.permitRecursiveSerialization = true;
-                    continue;
-                }
-                if (prop.creatorParameter != null && prop.creatorParameter.hasAnnotation(RecursiveSerialization.class)) {
-                    prop.permitRecursiveSerialization = true;
-                }
+                // if there's a @RecursiveSerialization on *any* of the involved elements, mark the property for recursive ser
+                prop.permitRecursiveSerialization = prop.annotatedElementsInOrder(forSerialization)
+                        .anyMatch(element -> element.hasAnnotation(RecursiveSerialization.class));
+
+                // infer nullable support from the first @Nullable/@NonNull annotation we find
+                prop.nullable = prop.annotatedElementsInOrder(forSerialization)
+                        .map(element -> {
+                            if (element.isNullable()) {
+                                return true;
+                            } else if (element.isNonNull()) {
+                                return false;
+                            } else {
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .findFirst().orElse(false);
             }
         }
 
@@ -316,6 +314,7 @@ class BeanIntrospector {
         String name;
 
         boolean permitRecursiveSerialization;
+        boolean nullable;
 
         @Nullable
         Accessor<FieldElement> field;
@@ -346,6 +345,25 @@ class BeanIntrospector {
             } else {
                 return setter != null || field != null || creatorParameter != null;
             }
+        }
+
+        Stream<Accessor<? extends MemberElement>> accessorsInOrder(boolean forSerialization) {
+            return (forSerialization ? Stream.of(getter, setter, field) : Stream.of(setter, getter, field)).filter(Objects::nonNull);
+        }
+
+        /**
+         * Get the elements for this property that should be scanned for annotations, in order of priority.
+         */
+        Stream<Element> annotatedElementsInOrder(boolean forSerialization) {
+            Stream<Element> stream = accessorsInOrder(forSerialization).map(a -> a.accessor);
+            if (creatorParameter != null) {
+                if (forSerialization) {
+                    stream = Stream.concat(stream, Stream.of(creatorParameter));
+                } else {
+                    stream = Stream.concat(Stream.of(creatorParameter), stream);
+                }
+            }
+            return stream;
         }
     }
 

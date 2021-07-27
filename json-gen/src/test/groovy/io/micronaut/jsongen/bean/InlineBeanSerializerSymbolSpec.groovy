@@ -371,4 +371,24 @@ class Test {
         expect:
         des.foo == "1"
     }
+
+    void "nullable"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import io.micronaut.core.annotation.Nullable;
+class Test {
+    @Nullable String foo;
+}
+''')
+
+        def des = deserializeFromString(compiled.serializer, '{"foo": null}')
+        def testBean = compiled.newInstance()
+        testBean.foo = null
+
+        expect:
+        des.foo == null
+        serializeToString(compiled.serializer, testBean) == '{"foo":null}'
+    }
 }
