@@ -4,6 +4,7 @@ import groovy.transform.Immutable
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.jsongen.Serializer
 import io.micronaut.jsongen.SerializerUtils
+import io.micronaut.jsongen.generator.ProblemReporter
 import io.micronaut.jsongen.generator.SerializerLinker
 import io.micronaut.jsongen.generator.SingletonSerializerGenerator
 import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol
@@ -20,7 +21,9 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
         def classElement = buildClassElement(cls)
 
         def linker = new SerializerLinker()
-        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(classElement, new InlineBeanSerializerSymbol(linker));
+        def problemReporter = new ProblemReporter()
+        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(problemReporter, classElement, new InlineBeanSerializerSymbol(linker));
+        problemReporter.throwOnFailures()
         def files = newJavaParser().generate(
                 new StringSourceJavaFileObject(classElement.name, cls),
                 new StringSourceJavaFileObject(result.serializerClassName.reflectionName(), result.generatedFile.toString())

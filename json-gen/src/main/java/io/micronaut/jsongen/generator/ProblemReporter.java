@@ -40,6 +40,16 @@ public final class ProblemReporter {
         }
     }
 
+    public void throwOnFailures() {
+        if (isFailed()) {
+            StringBuilder msg = new StringBuilder("Generation failure: ");
+            for (Problem problem : problems) {
+                msg.append('\n').append(problem.level).append(' ').append(problem.message);
+            }
+            throw new AssertionError(msg);
+        }
+    }
+
     public boolean isFailed() {
         return failed;
     }
