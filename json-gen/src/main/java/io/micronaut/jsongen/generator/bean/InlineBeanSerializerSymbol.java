@@ -17,10 +17,15 @@ package io.micronaut.jsongen.generator.bean;
 
 import com.fasterxml.jackson.core.JsonToken;
 import com.squareup.javapoet.CodeBlock;
+import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.jsongen.JsonParseException;
+import io.micronaut.jsongen.SerializableBean;
 import io.micronaut.jsongen.generator.*;
 
 import java.util.*;
@@ -31,15 +36,43 @@ import static io.micronaut.jsongen.generator.Names.ENCODER;
 
 public class InlineBeanSerializerSymbol implements SerializerSymbol {
     private final SerializerLinker linker;
+    /**
+     * Optional {@link VisitorContext} that is used to resolve class-level annotations on types passed into this symbol.
+     */
+    @Nullable
+    private final VisitorContext typeResolutionContext;
 
-    public InlineBeanSerializerSymbol(SerializerLinker linker) {
+    public InlineBeanSerializerSymbol(SerializerLinker linker, @Nullable VisitorContext typeResolutionContext) {
         this.linker = linker;
+        this.typeResolutionContext = typeResolutionContext;
+    }
+
+    private Collection<AnnotatedElement> findAdditionalAnnotationSource(ClassElement type) {
+        if (typeResolutionContext != null) {
+            Optional<ClassElement> resolved = typeResolutionContext.getClassElement(type.getName());
+            if (resolved.isPresent()) {
+                return Collections.singleton(resolved.get());
+            }
+        }
+        return Collections.emptyList();
     }
 
     @Override
     public boolean canSerialize(ClassElement type) {
-        // this symbol is not part of the normal linker chain, so this does not apply.
-        throw new UnsupportedOperationException();
+        // can we serialize inline?
+        return canSerialize(type, true);
+    }
+
+    public boolean canSerializeStandalone(ClassElement type) {
+        return canSerialize(type, false);
+    }
+
+    private boolean canSerialize(ClassElement type, boolean inlineRole) {
+        AnnotationValue<SerializableBean> annotation = ElementUtil.getAnnotation(SerializableBean.class, type, findAdditionalAnnotationSource(type));
+        if (annotation == null) {
+            return false;
+        }
+        return annotation.get("inline", Boolean.class).orElse(false) == inlineRole;
     }
 
     @Override
@@ -51,7 +84,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         // technically, this could lead to false positives for checking, since ser types will be considered in a subgraph that is only reachable through deser
         for (boolean ser : new boolean[] {true, false}) {
             ProblemReporter problemReporter = new ProblemReporter();
-            BeanDefinition definition = BeanIntrospector.introspect(problemReporter, type, ser);
+            BeanDefinition definition = BeanIntrospector.introspect(problemReporter, type, findAdditionalAnnotationSource(type), ser);
             if (problemReporter.isFailed()) {
                 // definition may be in an invalid state. The actual errors will be reported by the codegen, so just skip here
                 continue;
@@ -76,7 +109,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
-        BeanDefinition definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, true);
+        BeanDefinition definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, findAdditionalAnnotationSource(type), true);
         if (generatorContext.getProblemReporter().isFailed()) {
             // definition may be in an invalid state, so just skip codegen
             return CodeBlock.of("");
@@ -144,7 +177,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             this.generatorContext = generatorContext;
             this.type = type;
 
-            definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, false);
+            definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, findAdditionalAnnotationSource(type), false);
             localVariableNames = definition.props.stream()
                     .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
             duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, definition.props);

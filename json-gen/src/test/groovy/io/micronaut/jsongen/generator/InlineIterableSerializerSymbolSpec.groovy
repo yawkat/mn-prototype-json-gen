@@ -9,7 +9,7 @@ import spock.lang.Ignore
 class InlineIterableSerializerSymbolSpec extends AbstractSymbolSpec {
     def "array"() {
         given:
-        def serializer = buildBasicSerializer(String[].class, new SerializerLinker().array)
+        def serializer = buildBasicSerializer(String[].class, new SerializerLinker(null).array)
 
         expect:
         deserializeFromString(serializer, '["foo", "bar"]') == new String[]{'foo', 'bar'}
@@ -21,7 +21,7 @@ class InlineIterableSerializerSymbolSpec extends AbstractSymbolSpec {
         given:
         def listType = new TypeToken<List<String>>() {}.getType()
         def listElement = ClassElement.of(List.class, AnnotationMetadata.EMPTY_METADATA, ['E': ClassElement.of(String.class)])
-        def serializer = buildBasicSerializer(listType, new SerializerLinker().arrayList, listElement)
+        def serializer = buildBasicSerializer(listType, new SerializerLinker(null).arrayList, listElement)
 
         expect:
         deserializeFromString(serializer, '["foo", "bar"]') == ['foo', 'bar']

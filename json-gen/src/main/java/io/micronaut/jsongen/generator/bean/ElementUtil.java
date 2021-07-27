@@ -1,9 +1,13 @@
 package io.micronaut.jsongen.generator.bean;
 
+import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
+import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Map;
 
 final class ElementUtil {
@@ -49,5 +53,19 @@ final class ElementUtil {
             }
         }
         return true;
+    }
+
+    static <T extends Annotation> AnnotationValue<T> getAnnotation(Class<T> type, AnnotatedElement one, Collection<AnnotatedElement> additional) {
+        AnnotationValue<T> value = one.getAnnotation(type);
+        if (value != null) {
+            return value;
+        }
+        for (AnnotatedElement other : additional) {
+            value = other.getAnnotation(type);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 }

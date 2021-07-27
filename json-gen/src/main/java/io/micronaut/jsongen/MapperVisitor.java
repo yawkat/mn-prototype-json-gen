@@ -35,8 +35,11 @@ import java.io.Writer;
 public class MapperVisitor implements TypeElementVisitor<SerializableBean, SerializableBean> {
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        SerializerLinker linker = new SerializerLinker();
-        InlineBeanSerializerSymbol inlineBeanSerializer = new InlineBeanSerializerSymbol(linker);
+        SerializerLinker linker = new SerializerLinker(context);
+        InlineBeanSerializerSymbol inlineBeanSerializer = linker.inlineBean;
+        if (!inlineBeanSerializer.canSerializeStandalone(element)) {
+            return;
+        }
         DependencyGraphChecker depChecker = new DependencyGraphChecker(context, linker);
         depChecker.checkCircularDependencies(inlineBeanSerializer, element, element);
         if (depChecker.hasAnyFailures()) {

@@ -99,7 +99,7 @@ public class DependencyGraphChecker {
             }
 
             if (classDecl.get().isAnnotationPresent(SerializableBean.class)) {
-                visitChild(new InlineBeanSerializerSymbol(linker), dependencyType, null);
+                visitChild(linker.inlineBean, dependencyType, null);
             } // else, a custom serializer.
         }
 

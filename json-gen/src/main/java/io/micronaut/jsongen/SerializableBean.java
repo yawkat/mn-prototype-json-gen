@@ -23,5 +23,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.CLASS) // todo: is this sufficient for libraries?
 public @interface SerializableBean {
-    // boolean inline() default false; todo
+    boolean inline() default false;
 }

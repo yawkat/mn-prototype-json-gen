@@ -20,9 +20,9 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
     CompiledBean<?> buildSerializer(@Language("java") String cls) {
         def classElement = buildClassElement(cls)
 
-        def linker = new SerializerLinker()
+        def linker = new SerializerLinker(null)
         def problemReporter = new ProblemReporter()
-        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(problemReporter, classElement, new InlineBeanSerializerSymbol(linker));
+        SingletonSerializerGenerator.GenerationResult result = SingletonSerializerGenerator.generate(problemReporter, classElement, new InlineBeanSerializerSymbol(linker, typeResolutionContext));
         problemReporter.throwOnFailures()
         def files = newJavaParser().generate(
                 new StringSourceJavaFileObject(classElement.name, cls),

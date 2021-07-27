@@ -15,22 +15,35 @@
  */
 package io.micronaut.jsongen.generator;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.jsongen.generator.bean.InlineBeanSerializerSymbol;
 
 import java.util.Arrays;
 import java.util.List;
 
 public final class SerializerLinker {
+    @Internal
+    public final InlineBeanSerializerSymbol inlineBean;
+
     final InlineIterableSerializerSymbol.ArrayImpl array = new InlineIterableSerializerSymbol.ArrayImpl(this);
     final InlineIterableSerializerSymbol.ArrayListImpl arrayList = new InlineIterableSerializerSymbol.ArrayListImpl(this);
 
-    private final List<SerializerSymbol> symbolList = Arrays.asList(
-            array,
-            arrayList,
-            PrimitiveSerializerSymbol.INSTANCE,
-            StringSerializerSymbol.INSTANCE,
-            new InjectingSerializerSymbol(this)
-    );
+    private final List<SerializerSymbol> symbolList;
+
+    public SerializerLinker(VisitorContext typeResolutionContext) {
+        inlineBean = new InlineBeanSerializerSymbol(this, typeResolutionContext);
+        symbolList = Arrays.asList(
+                array,
+                arrayList,
+                PrimitiveSerializerSymbol.INSTANCE,
+                StringSerializerSymbol.INSTANCE,
+                // for serializing beans inline (@SerializableBean(inline=true))
+                inlineBean,
+                new InjectingSerializerSymbol(this)
+        );
+    }
 
     public SerializerSymbol findSymbol(ClassElement type) {
         for (SerializerSymbol serializerSymbol : symbolList) {

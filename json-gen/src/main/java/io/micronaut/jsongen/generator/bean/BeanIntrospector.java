@@ -30,9 +30,16 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 class BeanIntrospector {
-    public static BeanDefinition introspect(ProblemReporter problemReporter, ClassElement clazz, boolean forSerialization) {
+    /**
+     * @param problemReporter            Where to output problems
+     * @param clazz                      Class to introspect
+     * @param additionalAnnotationSource Additional elements that should be scanned for class-level annotations
+     * @param forSerialization           Whether this introspection is intended for serialization or deserialization
+     * @return The introspection result
+     */
+    public static BeanDefinition introspect(ProblemReporter problemReporter, ClassElement clazz, Collection<AnnotatedElement> additionalAnnotationSource, boolean forSerialization) {
         Scanner scanner = new Scanner(problemReporter, forSerialization);
-        scanner.scan(clazz);
+        scanner.scan(clazz, additionalAnnotationSource);
         BeanDefinition beanDefinition = new BeanDefinition();
         Map<PropBuilder, BeanDefinition.Property> completeProps = new LinkedHashMap<>();
         for (PropBuilder prop : scanner.byName.values()) {
@@ -157,8 +164,8 @@ class BeanIntrospector {
             return new Accessor<>(finalName, element, type);
         }
 
-        void scan(ClassElement clazz) {
-            AnnotationValue<JsonIgnoreProperties> jsonIgnoreProperties = clazz.getAnnotation(JsonIgnoreProperties.class);
+        void scan(ClassElement clazz, Collection<AnnotatedElement> additionalAnnotationSource) {
+            AnnotationValue<JsonIgnoreProperties> jsonIgnoreProperties = ElementUtil.getAnnotation(JsonIgnoreProperties.class, clazz, additionalAnnotationSource);
             if (jsonIgnoreProperties != null) {
                 ignoreUnknownProperties = jsonIgnoreProperties.get("ignoreUnknown", Boolean.class).orElse(false);
             }
