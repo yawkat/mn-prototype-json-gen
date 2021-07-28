@@ -290,4 +290,30 @@ class C {
         serializeToString(serializerA, a) == '{"b":{"foo":{"bar":"123"}}}'
         deserializeFromString(serializerA, '{"b":{"foo":{"bar":"123"}}}').b.foo.bar == "123"
     }
+
+    void "enum"() {
+        given:
+        def compiled = buildClassLoader('example.Test', '''
+package example;
+
+@io.micronaut.jsongen.SerializableBean
+class A {
+    E e;
+}
+
+enum E {
+    A, B
+}
+''')
+
+        def a = compiled.loadClass("example.A").newInstance()
+        a.e = compiled.loadClass("example.E").enumConstants[1]
+
+        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').newInstance()
+
+        expect:
+        serializeToString(serializerA, a) == '{"e":"B"}'
+        deserializeFromString(serializerA, '{"e":"A"}').e.name() == 'A'
+        deserializeFromString(serializerA, '{"e":"B"}').e.name() == 'B'
+    }
 }
