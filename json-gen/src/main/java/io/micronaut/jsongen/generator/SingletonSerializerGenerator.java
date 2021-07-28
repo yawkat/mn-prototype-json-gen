@@ -59,17 +59,13 @@ public final class SingletonSerializerGenerator {
     ) {
         GeneratorContext classContext = GeneratorContext.create(problemReporter, valueName.toString());
 
-        SerializerSymbol.DeserializationCode deserializationCode = symbol.deserialize(classContext.newMethodContext(DECODER), valueType);
         MethodSpec deserialize = MethodSpec.methodBuilder("deserialize")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(JsonParser.class, DECODER)
                 .returns(valueName)
                 .addException(IOException.class)
-                .addCode(CodeBlock.builder()
-                        .add(deserializationCode.getStatements())
-                        .addStatement("return $L", deserializationCode.getResultExpression())
-                        .build())
+                .addCode(symbol.deserialize(classContext.newMethodContext(DECODER), valueType, expr -> CodeBlock.of("return $L;\n", expr)))
                 .build();
 
         MethodSpec serialize = MethodSpec.methodBuilder("serialize")

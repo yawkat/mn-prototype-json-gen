@@ -68,7 +68,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
-    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
+    public CodeBlock deserialize(GeneratorContext generatorContext, ClassElement type, Setter setter) {
         ClassElement elementType = getElementType(type);
         SerializerSymbol elementDeserializer = linker.findSymbol(elementType);
 
@@ -78,16 +78,10 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         block.add("if ($N.currentToken() != $T.START_ARRAY) throw $T.from($N, \"Unexpected token \" + $N.currentToken() + \", expected START_OBJECT\");\n", DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
         block.add(createIntermediate(elementType, intermediateVariable));
         block.beginControlFlow("while ($N.nextToken() != $T.END_ARRAY)", DECODER, JsonToken.class);
-
-        DeserializationCode elementDeserCode = elementDeserializer.deserialize(generatorContext, elementType);
-        block.add(elementDeserCode.getStatements());
-        block.addStatement("$N.add($L)", intermediateVariable, elementDeserCode.getResultExpression());
-
+        block.add(elementDeserializer.deserialize(generatorContext, elementType, expr -> CodeBlock.of("$N.add($L);\n", intermediateVariable, expr)));
         block.endControlFlow();
-        return new DeserializationCode(
-                block.build(),
-                finishDeserialize(elementType, intermediateVariable)
-        );
+        block.add(setter.createSetStatement(finishDeserialize(elementType, intermediateVariable)));
+        return block.build();
     }
 
     protected CodeBlock createIntermediate(ClassElement elementType, String intermediateVariable) {

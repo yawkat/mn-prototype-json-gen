@@ -141,8 +141,8 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
-    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
-        return new DeserGen(generatorContext, type).generate();
+    public CodeBlock deserialize(GeneratorContext generatorContext, ClassElement type, Setter setter) {
+        return new DeserGen(generatorContext, type).generate(setter);
     }
 
     private static String getDefaultValueExpression(ClassElement clazz) {
@@ -186,10 +186,10 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, definition.props);
         }
 
-        private DeserializationCode generate() {
+        private CodeBlock generate(Setter setter) {
             // if there were failures, the definition may be in an inconsistent state, so we avoid codegen.
             if (generatorContext.getProblemReporter().isFailed()) {
-                return new DeserializationCode(CodeBlock.of(""));
+                return CodeBlock.of("");
             }
 
             deserialize.add("if ($N.currentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.currentToken() + \", expected START_OBJECT\");\n",
@@ -237,19 +237,16 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             // assemble the result object
 
             String resultVariable = combineLocalsToResultVariable();
-            return new DeserializationCode(
-                    deserialize.build(),
-                    CodeBlock.of("$N", resultVariable)
-            );
+            deserialize.add(setter.createSetStatement(CodeBlock.of("$N", resultVariable)));
+            return deserialize.build();
         }
 
         private void deserializeProperty(BeanDefinition.Property prop) {
             duplicatePropertyManager.emitReadVariable(deserialize, prop);
 
-            SerializerSymbol.DeserializationCode deserializationCode = findSymbol(prop)
-                    .deserialize(generatorContext.withSubPath(prop.name), prop.getType());
-            deserialize.add(deserializationCode.getStatements());
-            deserialize.addStatement("$N = $L", localVariableNames.get(prop), deserializationCode.getResultExpression());
+            CodeBlock deserializationCode = findSymbol(prop)
+                    .deserialize(generatorContext.withSubPath(prop.name), prop.getType(), expr -> CodeBlock.of("$N = $L;\n", localVariableNames.get(prop), expr));
+            deserialize.add(deserializationCode);
         }
 
         /**

@@ -50,14 +50,14 @@ final class PrimitiveSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
-    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
+    public CodeBlock deserialize(GeneratorContext generatorContext, ClassElement type, Setter setter) {
         if (!type.isPrimitive() || type.isArray()) {
             throw new UnsupportedOperationException("This symbol can only handle primitives");
         }
-        return new DeserializationCode(
-                checkCorrectToken(generatorContext, type),
-                CodeBlock.of(deserializeExpression(type))
-        );
+        return CodeBlock.builder()
+                .add(checkCorrectToken(generatorContext, type))
+                .add(setter.createSetStatement(CodeBlock.of(deserializeExpression(type))))
+                .build();
     }
 
     private CodeBlock checkCorrectToken(GeneratorContext generatorContext, ClassElement type) {

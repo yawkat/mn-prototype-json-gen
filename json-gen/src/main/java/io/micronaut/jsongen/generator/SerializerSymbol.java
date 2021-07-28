@@ -50,37 +50,17 @@ public interface SerializerSymbol {
      *
      * @param generatorContext The context of the generator, e.g. declared local variables.
      * @param type The type of the value being deserialized.
+     * @param setter The setter to use to build the final return value.
      * @return The code that performs the deserialization.
      */
-    DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type);
+    CodeBlock deserialize(GeneratorContext generatorContext, ClassElement type, Setter setter);
 
-    class DeserializationCode {
+    @FunctionalInterface
+    interface Setter {
         /**
-         * The main deserialization code.
+         * Create a statement that assigns the given expression using this setter. The given expression must only be evaluated once.
          */
-        private final CodeBlock statements;
-        /**
-         * The expression used to access the final deserialized value. Must be evaluated immediately after the other
-         * {@link #statements}, in the same scope. Must only be evaluated once.
-         */
-        private final CodeBlock resultExpression;
-
-        public DeserializationCode(CodeBlock statements, CodeBlock resultExpression) {
-            this.statements = statements;
-            this.resultExpression = resultExpression;
-        }
-
-        public DeserializationCode(CodeBlock resultExpression) {
-            this(CodeBlock.of(""), resultExpression);
-        }
-
-        public CodeBlock getStatements() {
-            return statements;
-        }
-
-        public CodeBlock getResultExpression() {
-            return resultExpression;
-        }
+        CodeBlock createSetStatement(CodeBlock expression);
     }
 
     interface DependencyVisitor {

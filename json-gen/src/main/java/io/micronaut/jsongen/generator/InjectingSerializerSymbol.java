@@ -61,8 +61,8 @@ final class InjectingSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
-    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
-        return new DeserializationCode(CodeBlock.of("$L.deserialize($N)", getSerializerAccess(generatorContext, type), Names.DECODER));
+    public CodeBlock deserialize(GeneratorContext generatorContext, ClassElement type, Setter setter) {
+        return setter.createSetStatement(CodeBlock.of("$L.deserialize($N)", getSerializerAccess(generatorContext, type), Names.DECODER));
     }
 
     private CodeBlock getSerializerAccess(GeneratorContext generatorContext, ClassElement type) {

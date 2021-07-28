@@ -40,20 +40,13 @@ public class NullableSerializerSymbol implements SerializerSymbol {
     }
 
     @Override
-    public DeserializationCode deserialize(GeneratorContext generatorContext, ClassElement type) {
-        String variable = generatorContext.newLocalVariable("tmp");
-        DeserializationCode delegateCode = delegate.deserialize(generatorContext, type);
-        return new DeserializationCode(
-                CodeBlock.builder()
-                        .addStatement("$T $N", PoetUtil.toTypeName(type), variable)
-                        .beginControlFlow("if ($N.currentToken() == $T.VALUE_NULL)", Names.DECODER, JsonToken.class)
-                        .addStatement("$N = null", variable)
-                        .nextControlFlow("else")
-                        .add(delegateCode.getStatements())
-                        .addStatement("$N = $L", variable, delegateCode.getResultExpression())
-                        .endControlFlow()
-                        .build(),
-                CodeBlock.of("$N", variable)
-        );
+    public CodeBlock deserialize(GeneratorContext generatorContext, ClassElement type, Setter setter) {
+        return CodeBlock.builder()
+                .beginControlFlow("if ($N.currentToken() == $T.VALUE_NULL)", Names.DECODER, JsonToken.class)
+                .add(setter.createSetStatement(CodeBlock.of("null")))
+                .nextControlFlow("else")
+                .add(delegate.deserialize(generatorContext, type, setter))
+                .endControlFlow()
+                .build();
     }
 }
