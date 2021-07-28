@@ -391,4 +391,32 @@ class Test {
         des.foo == null
         serializeToString(compiled.serializer, testBean) == '{"foo":null}'
     }
+
+    void "unwrapped"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+class Test {
+    @JsonUnwrapped Name name = new Name();
+}
+
+class Name {
+    String first;
+    String last;
+}
+''')
+
+        def des = deserializeFromString(compiled.serializer, '{"first":"foo","last":"bar"}')
+        def testBean = compiled.newInstance()
+        testBean.name.first = "foo"
+        testBean.name.last = "bar"
+
+        expect:
+        serializeToString(compiled.serializer, testBean) == '{"first":"foo","last":"bar"}'
+        des.name != null
+        des.name.first == "foo"
+        des.name.last == "bar"
+    }
 }

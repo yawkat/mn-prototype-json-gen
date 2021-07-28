@@ -57,6 +57,10 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         return Collections.emptyList();
     }
 
+    private BeanDefinition introspect(ProblemReporter problemReporter, ClassElement type, boolean forSerialization) {
+        return BeanIntrospector.introspect(problemReporter, type, findAdditionalAnnotationSource(type), forSerialization);
+    }
+
     @Override
     public boolean canSerialize(ClassElement type) {
         // can we serialize inline?
@@ -82,9 +86,9 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         }
         // have to check both ser/deser, in case property types differ (e.g. when setters and getters have different types)
         // technically, this could lead to false positives for checking, since ser types will be considered in a subgraph that is only reachable through deser
-        for (boolean ser : new boolean[] {true, false}) {
+        for (boolean ser : new boolean[]{true, false}) {
             ProblemReporter problemReporter = new ProblemReporter();
-            BeanDefinition definition = BeanIntrospector.introspect(problemReporter, type, findAdditionalAnnotationSource(type), ser);
+            BeanDefinition definition = introspect(problemReporter, type, ser);
             if (problemReporter.isFailed()) {
                 // definition may be in an invalid state. The actual errors will be reported by the codegen, so just skip here
                 continue;
@@ -112,7 +116,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     @Override
     public CodeBlock serialize(GeneratorContext generatorContext, ClassElement type, CodeBlock readExpression) {
-        BeanDefinition definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, findAdditionalAnnotationSource(type), true);
+        BeanDefinition definition = introspect(generatorContext.getProblemReporter(), type, true);
         if (generatorContext.getProblemReporter().isFailed()) {
             // definition may be in an invalid state, so just skip codegen
             return CodeBlock.of("");
@@ -124,8 +128,13 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
         serialize.addStatement("$T $N = $L", PoetUtil.toTypeName(type), objectVarName, readExpression);
         // passing the value to writeStartObject helps with debugging, but will not affect functionality
         serialize.addStatement("$N.writeStartObject($N)", ENCODER, objectVarName);
+        serializeBeanProperties(generatorContext, definition, objectVarName, serialize);
+        serialize.addStatement("$N.writeEndObject()", ENCODER);
+        return serialize.build();
+    }
+
+    private void serializeBeanProperties(GeneratorContext generatorContext, BeanDefinition definition, String objectVarName, CodeBlock.Builder serialize) {
         for (BeanDefinition.Property prop : definition.props) {
-            serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
             CodeBlock propRead;
             if (prop.getter != null) {
                 propRead = CodeBlock.of("$N.$N()", objectVarName, prop.getter.getName());
@@ -134,10 +143,17 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             } else {
                 throw new AssertionError("No accessor, property should have been filtered");
             }
-            serialize.add(findSymbol(prop).serialize(generatorContext.withSubPath(prop.name), prop.getType(), propRead));
+            GeneratorContext subGenerator = generatorContext.withSubPath(prop.name);
+            if (prop.unwrapped) {
+                String tempVariable = generatorContext.newLocalVariable(prop.name);
+                serialize.addStatement("$T $N = $L", PoetUtil.toTypeName(prop.getType()), tempVariable, propRead);
+                BeanDefinition subDefinition = introspect(generatorContext.getProblemReporter(), prop.getType(), true);
+                serializeBeanProperties(subGenerator, subDefinition, tempVariable, serialize);
+            } else {
+                serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
+                serialize.add(findSymbol(prop).serialize(subGenerator, prop.getType(), propRead));
+            }
         }
-        serialize.addStatement("$N.writeEndObject()", ENCODER);
-        return serialize.build();
     }
 
     @Override
@@ -161,9 +177,11 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
     private class DeserGen {
         private final GeneratorContext generatorContext;
-        private final ClassElement type;
+        private final ClassElement rootType;
 
-        private final BeanDefinition definition;
+        private final BeanDefinition rootDefinition;
+        private final Map<BeanDefinition.Property, BeanDefinition> unwrappedDefinitions = new HashMap<>(); // filled in introspectRecursive
+        private final List<BeanDefinition.Property> leafProperties = new ArrayList<>(); // filled in introspectRecursive
         /**
          * Names of the local variables properties are saved in.
          */
@@ -178,12 +196,24 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
         DeserGen(GeneratorContext generatorContext, ClassElement type) {
             this.generatorContext = generatorContext;
-            this.type = type;
+            this.rootType = type;
 
-            definition = BeanIntrospector.introspect(generatorContext.getProblemReporter(), type, findAdditionalAnnotationSource(type), false);
-            localVariableNames = definition.props.stream()
+            rootDefinition = introspectRecursive(type);
+            localVariableNames = leafProperties.stream()
                     .collect(Collectors.toMap(prop -> prop, prop -> generatorContext.newLocalVariable(prop.name)));
-            duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, definition.props);
+            duplicatePropertyManager = new DuplicatePropertyManager(generatorContext, leafProperties);
+        }
+
+        private BeanDefinition introspectRecursive(ClassElement type) {
+            BeanDefinition def = introspect(generatorContext.getProblemReporter(), type, false);
+            for (BeanDefinition.Property prop : def.props) {
+                if (prop.unwrapped) {
+                    unwrappedDefinitions.put(prop, introspectRecursive(prop.getType()));
+                } else {
+                    leafProperties.add(prop);
+                }
+            }
+            return def;
         }
 
         private CodeBlock generate(Setter setter) {
@@ -198,7 +228,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             duplicatePropertyManager.emitMaskDeclarations(deserialize);
 
             // create a local variable for each property
-            for (BeanDefinition.Property prop : definition.props) {
+            for (BeanDefinition.Property prop : leafProperties) {
                 deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(prop.getType()), localVariableNames.get(prop), getDefaultValueExpression(prop.getType()));
             }
 
@@ -213,7 +243,8 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             deserialize.addStatement("$T $N = $N.getCurrentName()", String.class, fieldNameVariable, DECODER);
             deserialize.addStatement("$N.nextToken()", DECODER);
             deserialize.beginControlFlow("switch ($N)", fieldNameVariable);
-            for (BeanDefinition.Property prop : definition.props) {
+            for (BeanDefinition.Property prop : leafProperties) {
+                // todo: detect duplicates
                 deserialize.beginControlFlow("case $S:", prop.name);
                 deserializeProperty(prop);
                 deserialize.addStatement("break");
@@ -221,11 +252,11 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             }
 
             // unknown properties
-            if (!definition.ignoreUnknownProperties) {
+            if (!rootDefinition.ignoreUnknownProperties) {
                 deserialize.beginControlFlow("default:");
                 // todo: do we really want to output a potentially attacker-controlled field name to the logs here?
                 deserialize.addStatement("throw $T.from($N, $S + $N)",
-                        JsonParseException.class, DECODER, "Unknown property for type " + type.getName() + ": ", fieldNameVariable);
+                        JsonParseException.class, DECODER, "Unknown property for type " + rootType.getName() + ": ", fieldNameVariable);
                 deserialize.endControlFlow();
             }
 
@@ -236,7 +267,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
             // assemble the result object
 
-            String resultVariable = combineLocalsToResultVariable();
+            String resultVariable = combineLocalsToResultVariable(rootType, rootDefinition);
             deserialize.add(setter.createSetStatement(CodeBlock.of("$N", resultVariable)));
             return deserialize.build();
         }
@@ -254,7 +285,14 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
          *
          * @return the result variable name
          */
-        private String combineLocalsToResultVariable() {
+        private String combineLocalsToResultVariable(ClassElement type, BeanDefinition definition) {
+            Map<BeanDefinition.Property, String> allPropertyLocals = new HashMap<>(localVariableNames);
+            for (BeanDefinition.Property prop : definition.props) {
+                if (prop.unwrapped) {
+                    allPropertyLocals.put(prop, combineLocalsToResultVariable(prop.getType(), unwrappedDefinitions.get(prop)));
+                }
+            }
+
             String resultVariable = generatorContext.newLocalVariable("result");
 
             CodeBlock.Builder creatorParameters = CodeBlock.builder();
@@ -263,7 +301,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 if (!firstParameter) {
                     creatorParameters.add(", ");
                 }
-                creatorParameters.add("$L", localVariableNames.get(prop));
+                creatorParameters.add("$L", allPropertyLocals.get(prop));
                 firstParameter = false;
             }
 
@@ -282,7 +320,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 throw new AssertionError("bad creator, should have been detected in BeanIntrospector");
             }
             for (BeanDefinition.Property prop : definition.props) {
-                String localVariable = localVariableNames.get(prop);
+                String localVariable = allPropertyLocals.get(prop);
                 if (prop.setter != null) {
                     deserialize.addStatement("$N.$N($N)", resultVariable, prop.setter.getName(), localVariable);
                 } else if (prop.field != null) {
@@ -303,7 +341,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
      * Note: implementation must use the same bit layout as BitSet to allow internal use of {@link BitSet#toLongArray()}.
      */
     private static class DuplicatePropertyManager {
-        private final List<BeanDefinition.Property> properties;
+        private final Collection<BeanDefinition.Property> properties;
 
         private final List<String> maskVariables;
         private final Map<BeanDefinition.Property, Integer> offsets;
@@ -312,7 +350,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
 
         DuplicatePropertyManager(
                 GeneratorContext context,
-                List<BeanDefinition.Property> properties
+                Collection<BeanDefinition.Property> properties
         ) {
             requiredMask = new BitSet(properties.size());
             this.properties = properties;

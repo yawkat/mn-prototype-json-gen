@@ -15,10 +15,7 @@
  */
 package io.micronaut.jsongen.generator.bean;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
@@ -70,6 +67,7 @@ class BeanIntrospector {
             }
             built = built.withPermitRecursiveSerialization(prop.permitRecursiveSerialization);
             built = built.withNullable(prop.nullable);
+            built = built.withUnwrapped(prop.unwrapped);
             completeProps.put(prop, built);
         }
         beanDefinition.props = new ArrayList<>(completeProps.values());
@@ -249,6 +247,15 @@ class BeanIntrospector {
                         })
                         .filter(Objects::nonNull)
                         .findFirst().orElse(false);
+
+                prop.unwrapped = prop.annotatedElementsInOrder(forSerialization)
+                        .anyMatch(element -> element.hasAnnotation(JsonUnwrapped.class));
+
+                if (prop.unwrapped && prop.permitRecursiveSerialization) {
+                    //noinspection OptionalGetWithoutIsPresent
+                    problemReporter.fail("Cannot combine @RecursiveSerialization with @JsonUnwrapped",
+                            prop.annotatedElementsInOrder(forSerialization).findFirst().get());
+                }
             }
         }
 
@@ -315,6 +322,7 @@ class BeanIntrospector {
 
         boolean permitRecursiveSerialization;
         boolean nullable;
+        boolean unwrapped;
 
         @Nullable
         Accessor<FieldElement> field;
@@ -387,7 +395,7 @@ class BeanIntrospector {
     private enum AccessorType {
         /**
          * {@literal @}{@link com.fasterxml.jackson.annotation.JsonIgnore}.
-         *
+         * <p>
          * todo: actually implement this
          */
         IGNORABLE,
