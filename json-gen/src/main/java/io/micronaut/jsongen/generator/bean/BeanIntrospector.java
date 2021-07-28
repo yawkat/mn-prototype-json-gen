@@ -68,6 +68,7 @@ class BeanIntrospector {
             built = built.withPermitRecursiveSerialization(prop.permitRecursiveSerialization);
             built = built.withNullable(prop.nullable);
             built = built.withUnwrapped(prop.unwrapped);
+            built = built.withAliases(prop.aliases);
             completeProps.put(prop, built);
         }
         beanDefinition.props = new ArrayList<>(completeProps.values());
@@ -256,6 +257,17 @@ class BeanIntrospector {
                     problemReporter.fail("Cannot combine @RecursiveSerialization with @JsonUnwrapped",
                             prop.annotatedElementsInOrder(forSerialization).findFirst().get());
                 }
+
+                prop.aliases = prop.annotatedElementsInOrder(forSerialization)
+                        .flatMap(element -> {
+                            AnnotationValue<JsonAlias> aliasAnnotation = element.getAnnotation(JsonAlias.class);
+                            if (aliasAnnotation == null) {
+                                return Stream.empty();
+                            } else {
+                                return Stream.of(aliasAnnotation.stringValues());
+                            }
+                        })
+                        .collect(Collectors.toSet());
             }
         }
 
@@ -323,6 +335,8 @@ class BeanIntrospector {
         boolean permitRecursiveSerialization;
         boolean nullable;
         boolean unwrapped;
+
+        Set<String> aliases;
 
         @Nullable
         Accessor<FieldElement> field;

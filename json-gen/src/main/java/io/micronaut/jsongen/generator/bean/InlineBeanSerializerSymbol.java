@@ -245,6 +245,9 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             deserialize.beginControlFlow("switch ($N)", fieldNameVariable);
             for (BeanDefinition.Property prop : leafProperties) {
                 // todo: detect duplicates
+                for (String alias : prop.aliases) {
+                    deserialize.addStatement("case $S:\n", alias);
+                }
                 deserialize.beginControlFlow("case $S:", prop.name);
                 deserializeProperty(prop);
                 deserialize.addStatement("break");

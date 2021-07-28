@@ -17,8 +17,10 @@ package io.micronaut.jsongen.generator.bean;
 
 import io.micronaut.inject.ast.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 class BeanDefinition {
     boolean ignoreUnknownProperties;
@@ -41,11 +43,13 @@ class BeanDefinition {
         final boolean nullable;
         final boolean unwrapped;
 
+        final Set<String> aliases;
+
         private Property(String name, FieldElement field, MethodElement getter, MethodElement setter, ParameterElement creatorParameter) {
-            this(name, field, getter, setter, creatorParameter, false, false, false);
+            this(name, field, getter, setter, creatorParameter, false, false, false, Collections.emptySet());
         }
 
-        private Property(String name, FieldElement field, MethodElement getter, MethodElement setter, ParameterElement creatorParameter, boolean permitRecursiveSerialization, boolean nullable, boolean unwrapped) {
+        private Property(String name, FieldElement field, MethodElement getter, MethodElement setter, ParameterElement creatorParameter, boolean permitRecursiveSerialization, boolean nullable, boolean unwrapped, Set<String> aliases) {
             this.name = name;
             this.field = field;
             this.getter = getter;
@@ -54,18 +58,23 @@ class BeanDefinition {
             this.permitRecursiveSerialization = permitRecursiveSerialization;
             this.nullable = nullable;
             this.unwrapped = unwrapped;
+            this.aliases = aliases;
         }
 
         public Property withPermitRecursiveSerialization(boolean value) {
-            return new Property(name, field, getter, setter, creatorParameter, value, nullable, unwrapped);
+            return new Property(name, field, getter, setter, creatorParameter, value, nullable, unwrapped, aliases);
         }
 
         public Property withNullable(boolean value) {
-            return new Property(name, field, getter, setter, creatorParameter, permitRecursiveSerialization, value, unwrapped);
+            return new Property(name, field, getter, setter, creatorParameter, permitRecursiveSerialization, value, unwrapped, aliases);
         }
 
         public Property withUnwrapped(boolean value) {
-            return new Property(name, field, getter, setter, creatorParameter, permitRecursiveSerialization, nullable, value);
+            return new Property(name, field, getter, setter, creatorParameter, permitRecursiveSerialization, nullable, value, aliases);
+        }
+
+        public Property withAliases(Set<String> value) {
+            return new Property(name, field, getter, setter, creatorParameter, permitRecursiveSerialization, nullable, unwrapped, value);
         }
 
         public ClassElement getType() {

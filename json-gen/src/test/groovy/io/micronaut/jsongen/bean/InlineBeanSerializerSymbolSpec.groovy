@@ -419,4 +419,21 @@ class Name {
         des.name.first == "foo"
         des.name.last == "bar"
     }
+
+    void "aliases"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.JsonAlias;
+class Test {
+    @JsonAlias("bar")
+    public String foo;
+}
+''')
+
+        expect:
+        deserializeFromString(compiled.serializer, '{"foo": "42"}').foo == '42'
+        deserializeFromString(compiled.serializer, '{"bar": "42"}').foo == '42'
+    }
 }
