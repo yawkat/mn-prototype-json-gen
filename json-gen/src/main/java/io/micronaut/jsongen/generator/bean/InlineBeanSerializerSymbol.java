@@ -192,7 +192,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 return new DeserializationCode(CodeBlock.of(""));
             }
 
-            deserialize.add("if ($N.currentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.getCurrentToken() + \", expected START_OBJECT\");\n",
+            deserialize.add("if ($N.currentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.currentToken() + \", expected START_OBJECT\");\n",
                     DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
 
             duplicatePropertyManager.emitMaskDeclarations(deserialize);

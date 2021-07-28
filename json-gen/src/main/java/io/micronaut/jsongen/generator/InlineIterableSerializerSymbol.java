@@ -19,8 +19,8 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.squareup.javapoet.CodeBlock;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.jsongen.JsonParseException;
 
-import java.io.IOException;
 import java.util.ArrayList;
 
 import static io.micronaut.jsongen.generator.Names.DECODER;
@@ -75,7 +75,7 @@ abstract class InlineIterableSerializerSymbol implements SerializerSymbol {
         String intermediateVariable = generatorContext.newLocalVariable("intermediate");
 
         CodeBlock.Builder block = CodeBlock.builder();
-        block.add("if ($N.currentToken() != $T.START_ARRAY) throw new $T();\n", DECODER, JsonToken.class, IOException.class); // TODO: error msg
+        block.add("if ($N.currentToken() != $T.START_ARRAY) throw $T.from($N, \"Unexpected token \" + $N.currentToken() + \", expected START_OBJECT\");\n", DECODER, JsonToken.class, JsonParseException.class, DECODER, DECODER);
         block.add(createIntermediate(elementType, intermediateVariable));
         block.beginControlFlow("while ($N.nextToken() != $T.END_ARRAY)", DECODER, JsonToken.class);
 
