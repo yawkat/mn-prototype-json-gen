@@ -21,7 +21,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Target(ElementType.TYPE)
-@Retention(RetentionPolicy.CLASS) // todo: is this sufficient for libraries?
+@Retention(RetentionPolicy.RUNTIME)
 public @interface SerializableBean {
     boolean inline() default false;
 }

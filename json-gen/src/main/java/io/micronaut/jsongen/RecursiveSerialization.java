@@ -21,6 +21,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD})
-@Retention(RetentionPolicy.CLASS) // todo: is this sufficient for libraries?
+@Retention(RetentionPolicy.RUNTIME)
 public @interface RecursiveSerialization {
 }
