@@ -165,7 +165,7 @@ class Test {
 }
 ''')
         def deserialized = deserializeFromString(compiled.serializer, '{"foo": "42"}')
-        def testBean = compiled.newInstance([String], ["42"])
+        def testBean = compiled.newInstance(["42"])
         def serialized = serializeToString(compiled.serializer, testBean)
 
         expect:
@@ -194,7 +194,7 @@ class Test {
 }
 ''')
         def deserialized = deserializeFromString(compiled.serializer, '{"foo": "42"}')
-        def testBean = compiled.newInstance([String], ["42"])
+        def testBean = compiled.newInstance(["42"])
         def serialized = serializeToString(compiled.serializer, testBean)
 
         expect:
@@ -227,7 +227,7 @@ class Test {
 }
 ''')
         def deserialized = deserializeFromString(compiled.serializer, '{"foo": "42"}')
-        def testBean = compiled.newInstance([String], ["42"])
+        def testBean = compiled.newInstance(["42"])
         def serialized = serializeToString(compiled.serializer, testBean)
 
         expect:
@@ -251,7 +251,7 @@ class Test {
 }
 ''')
         def deserialized = deserializeFromString(compiled.serializer, '{"foo": "42"}')
-        def testBean = compiled.newInstance([String], ["42"])
+        def testBean = compiled.newInstance(["42"])
         def serialized = serializeToString(compiled.serializer, testBean)
 
         expect:

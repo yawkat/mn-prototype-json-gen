@@ -52,8 +52,8 @@ class B {
         a.bar = "123"
         b.foo = "456"
 
-        def serializerB = (Serializer<?>) compiled.loadClass('example.B$Serializer').getConstructor().newInstance()
-        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').getConstructor(Serializer.class).newInstance(serializerB)
+        def serializerB = (Serializer<?>) compiled.loadClass('example.B$Serializer').newInstance()
+        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').newInstance(serializerB)
 
         expect:
         serializeToString(serializerB, b) == '{"foo":"456"}'
@@ -76,13 +76,11 @@ class Test {
 }
 ''')
 
-        def constructor = compiled.loadClass("example.Test").getDeclaredConstructor()
-        constructor.accessible = true
-        def test = constructor.newInstance()
+        def test = compiled.loadClass("example.Test").newInstance()
 
         test.list = ['foo', 'bar']
 
-        def serializer = (Serializer<?>) compiled.loadClass('example.Test$Serializer').getConstructor().newInstance()
+        def serializer = (Serializer<?>) compiled.loadClass('example.Test$Serializer').newInstance()
 
         expect:
         serializeToString(serializer, test) == '{"list":["foo","bar"]}'
@@ -108,7 +106,7 @@ class Test {
         def provider = new BeanProvider() {
             @Override
             Object get() {
-                return (Serializer<?>) compiled.loadClass('example.Test$Serializer').getConstructor(BeanProvider.class).newInstance(this)
+                return (Serializer<?>) compiled.loadClass('example.Test$Serializer').newInstance(this)
             }
         }
         def serializer = provider.get()
@@ -232,10 +230,10 @@ class C {
         b.foo = c
         c.bar = "123"
 
-        def serializerC = (Serializer<?>) compiled.loadClass('example.C$Serializer').getConstructor().newInstance()
+        def serializerC = (Serializer<?>) compiled.loadClass('example.C$Serializer').newInstance()
         def serializerBClass = compiled.loadClass('example.B$Serializer')
-        def serializerB = (Serializer<?>) serializerBClass.getConstructor(Serializer.class).newInstance(serializerC)
-        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').getConstructor(Serializer.class).newInstance(serializerB)
+        def serializerB = (Serializer<?>) serializerBClass.newInstance(serializerC)
+        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').newInstance(serializerB)
 
         def genericSerializerParam = serializerBClass.getDeclaredConstructor(Serializer.class).getGenericParameterTypes()[0]
 
@@ -285,8 +283,8 @@ class C {
         b.foo = c
         c.bar = "123"
 
-        def serializerC = (Serializer<?>) compiled.loadClass('example.C$Serializer').getConstructor().newInstance()
-        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').getConstructor(Serializer.class).newInstance(serializerC)
+        def serializerC = (Serializer<?>) compiled.loadClass('example.C$Serializer').newInstance()
+        def serializerA = (Serializer<?>) compiled.loadClass('example.A$Serializer').newInstance(serializerC)
 
         expect:
         serializeToString(serializerA, a) == '{"b":{"foo":{"bar":"123"}}}'

@@ -387,6 +387,8 @@ class BeanIntrospector {
     private enum AccessorType {
         /**
          * {@literal @}{@link com.fasterxml.jackson.annotation.JsonIgnore}.
+         *
+         * todo: actually implement this
          */
         IGNORABLE,
         /**

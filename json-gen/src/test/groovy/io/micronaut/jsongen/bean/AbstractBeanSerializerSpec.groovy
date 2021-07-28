@@ -43,7 +43,7 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
 
         def beanClass = classLoader.loadClass(classElement.name)
         def serializerClass = classLoader.loadClass(classElement.name + '$Serializer')
-        def serializerInstance = (Serializer<?>) serializerClass.getConstructor().newInstance()
+        def serializerInstance = (Serializer<?>) serializerClass.newInstance()
         return new CompiledBean(beanClass, serializerInstance)
     }
 
@@ -52,16 +52,8 @@ class AbstractBeanSerializerSpec extends AbstractTypeElementSpec implements Seri
         Class<T> beanClass
         Serializer<T> serializer
 
-        def newInstance() {
-            def constructor = beanClass.getDeclaredConstructor()
-            constructor.accessible = true
-            return constructor.newInstance()
-        }
-
-        def newInstance(List<Class<?>> paramTypes, List<?> params) {
-            def constructor = beanClass.getDeclaredConstructor(paramTypes.toArray(Class[]::new))
-            constructor.accessible = true
-            return constructor.newInstance(params.toArray(Object[]::new))
+        def newInstance(List<?> params = []) {
+            return beanClass.newInstance(params.toArray(Object[]::new))
         }
     }
 
