@@ -40,13 +40,8 @@ class B {
 }
 ''')
 
-        def constructorA = compiled.loadClass("example.A").getDeclaredConstructor()
-        constructorA.accessible = true
-        def a = constructorA.newInstance()
-
-        def constructorB = compiled.loadClass("example.B").getDeclaredConstructor()
-        constructorB.accessible = true
-        def b = constructorB.newInstance()
+        def a = compiled.loadClass("example.A").newInstance()
+        def b = compiled.loadClass("example.B").newInstance()
 
         a.b = b
         a.bar = "123"
@@ -98,10 +93,8 @@ class Test {
 }
 ''')
 
-        def constructor = compiled.loadClass("example.Test").getDeclaredConstructor()
-        constructor.accessible = true
-        def test = constructor.newInstance()
-        test.foo = constructor.newInstance()
+        def test = compiled.loadClass("example.Test").newInstance()
+        test.foo = compiled.loadClass("example.Test").newInstance()
 
         def provider = new BeanProvider() {
             @Override
@@ -214,17 +207,9 @@ class C {
 }
 ''')
 
-        def constructorA = compiled.loadClass("example.A").getDeclaredConstructor()
-        constructorA.accessible = true
-        def a = constructorA.newInstance()
-
-        def constructorB = compiled.loadClass("example.B").getDeclaredConstructor()
-        constructorB.accessible = true
-        def b = constructorB.newInstance()
-
-        def constructorC = compiled.loadClass("example.C").getDeclaredConstructor()
-        constructorC.accessible = true
-        def c = constructorC.newInstance()
+        def a = compiled.loadClass("example.A").newInstance()
+        def b = compiled.loadClass("example.B").newInstance()
+        def c = compiled.loadClass("example.C").newInstance()
 
         a.b = b
         b.foo = c
@@ -267,17 +252,9 @@ class C {
 }
 ''')
 
-        def constructorA = compiled.loadClass("example.A").getDeclaredConstructor()
-        constructorA.accessible = true
-        def a = constructorA.newInstance()
-
-        def constructorB = compiled.loadClass("example.B").getDeclaredConstructor()
-        constructorB.accessible = true
-        def b = constructorB.newInstance()
-
-        def constructorC = compiled.loadClass("example.C").getDeclaredConstructor()
-        constructorC.accessible = true
-        def c = constructorC.newInstance()
+        def a = compiled.loadClass("example.A").newInstance()
+        def b = compiled.loadClass("example.B").newInstance()
+        def c = compiled.loadClass("example.C").newInstance()
 
         a.b = b
         b.foo = c
