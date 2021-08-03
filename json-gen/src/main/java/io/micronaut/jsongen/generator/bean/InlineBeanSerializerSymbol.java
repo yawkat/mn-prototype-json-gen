@@ -122,37 +122,57 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             return CodeBlock.of("");
         }
 
-        String objectVarName = generatorContext.newLocalVariable("object");
 
-        CodeBlock.Builder serialize = CodeBlock.builder();
-        serialize.addStatement("$T $N = $L", PoetUtil.toTypeName(type), objectVarName, readExpression);
-        // passing the value to writeStartObject helps with debugging, but will not affect functionality
-        serialize.addStatement("$N.writeStartObject($N)", ENCODER, objectVarName);
-        serializeBeanProperties(generatorContext, definition, objectVarName, serialize);
-        serialize.addStatement("$N.writeEndObject()", ENCODER);
-        return serialize.build();
+        if (definition.valueProperty != null) {
+            // @JsonValue
+            return findSymbol(definition.valueProperty).serialize(
+                    generatorContext,
+                    definition.valueProperty.getType(),
+                    // we don't need a temp variable here, getPropertyAccessExpression only evaluates the read expression once
+                    getPropertyAccessExpression(readExpression, definition.valueProperty)
+            );
+        } else {
+            // normal path
+            CodeBlock.Builder serialize = CodeBlock.builder();
+            String objectVarName = generatorContext.newLocalVariable("object");
+            serialize.addStatement("$T $N = $L", PoetUtil.toTypeName(type), objectVarName, readExpression);
+            // passing the value to writeStartObject helps with debugging, but will not affect functionality
+            serialize.addStatement("$N.writeStartObject($N)", ENCODER, objectVarName);
+            serializeBeanProperties(generatorContext, definition, CodeBlock.of("$N", objectVarName), serialize);
+            serialize.addStatement("$N.writeEndObject()", ENCODER);
+            return serialize.build();
+        }
     }
 
-    private void serializeBeanProperties(GeneratorContext generatorContext, BeanDefinition definition, String objectVarName, CodeBlock.Builder serialize) {
+    /**
+     * @param generatorContext   Generator context
+     * @param definition         Definition of the bean we're serializing
+     * @param beanReadExpression The expression to use for accessing bean properties. May be evaluated multiple times.
+     * @param serialize          The output
+     */
+    private void serializeBeanProperties(GeneratorContext generatorContext, BeanDefinition definition, CodeBlock beanReadExpression, CodeBlock.Builder serialize) {
         for (BeanDefinition.Property prop : definition.props) {
-            CodeBlock propRead;
-            if (prop.getter != null) {
-                propRead = CodeBlock.of("$N.$N()", objectVarName, prop.getter.getName());
-            } else if (prop.field != null) {
-                propRead = CodeBlock.of("$N.$N", objectVarName, prop.field.getName());
-            } else {
-                throw new AssertionError("No accessor, property should have been filtered");
-            }
+            CodeBlock propRead = getPropertyAccessExpression(beanReadExpression, prop);
             GeneratorContext subGenerator = generatorContext.withSubPath(prop.name);
             if (prop.unwrapped) {
                 String tempVariable = generatorContext.newLocalVariable(prop.name);
                 serialize.addStatement("$T $N = $L", PoetUtil.toTypeName(prop.getType()), tempVariable, propRead);
                 BeanDefinition subDefinition = introspect(generatorContext.getProblemReporter(), prop.getType(), true);
-                serializeBeanProperties(subGenerator, subDefinition, tempVariable, serialize);
+                serializeBeanProperties(subGenerator, subDefinition, CodeBlock.of("$N", tempVariable), serialize);
             } else {
                 serialize.addStatement("$N.writeFieldName($S)", ENCODER, prop.name);
                 serialize.add(findSymbol(prop).serialize(subGenerator, prop.getType(), propRead));
             }
+        }
+    }
+
+    private CodeBlock getPropertyAccessExpression(CodeBlock beanReadExpression, BeanDefinition.Property prop) {
+        if (prop.getter != null) {
+            return CodeBlock.of("$L.$N()", beanReadExpression, prop.getter.getName());
+        } else if (prop.field != null) {
+            return CodeBlock.of("$L.$N", beanReadExpression, prop.field.getName());
+        } else {
+            throw new AssertionError("No accessor, property should have been filtered");
         }
     }
 
@@ -220,6 +240,15 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             // if there were failures, the definition may be in an inconsistent state, so we avoid codegen.
             if (generatorContext.getProblemReporter().isFailed()) {
                 return CodeBlock.of("");
+            }
+
+            if (rootDefinition.creatorDelegatingProperty != null) {
+                // delegating to another type
+                return findSymbol(rootDefinition.creatorDelegatingProperty).deserialize(
+                        generatorContext,
+                        rootDefinition.creatorDelegatingProperty.getType(),
+                        expr -> setter.createSetStatement(getCreatorCall(rootType, rootDefinition, expr))
+                );
             }
 
             deserialize.add("if ($N.currentToken() != $T.START_OBJECT) throw $T.from($N, \"Unexpected token \" + $N.currentToken() + \", expected START_OBJECT\");\n",
@@ -308,20 +337,7 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 firstParameter = false;
             }
 
-            if (definition.creator instanceof ConstructorElement) {
-                deserialize.addStatement("$T $N = new $T($L)", PoetUtil.toTypeName(type), resultVariable, PoetUtil.toTypeName(type), creatorParameters.build());
-            } else if (definition.creator.isStatic()) {
-                deserialize.addStatement(
-                        "$T $N = $T.$N($L)",
-                        PoetUtil.toTypeName(type),
-                        resultVariable,
-                        PoetUtil.toTypeName(definition.creator.getDeclaringType()),
-                        definition.creator.getName(),
-                        creatorParameters.build()
-                );
-            } else {
-                throw new AssertionError("bad creator, should have been detected in BeanIntrospector");
-            }
+            deserialize.addStatement("$T $N = $L", PoetUtil.toTypeName(type), resultVariable, getCreatorCall(type, definition, creatorParameters.build()));
             for (BeanDefinition.Property prop : definition.props) {
                 String localVariable = allPropertyLocals.get(prop);
                 if (prop.setter != null) {
@@ -335,6 +351,21 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
                 }
             }
             return resultVariable;
+        }
+
+        private CodeBlock getCreatorCall(ClassElement type, BeanDefinition definition, CodeBlock creatorParameters) {
+            if (definition.creator instanceof ConstructorElement) {
+                return CodeBlock.of("new $T($L)", PoetUtil.toTypeName(type), creatorParameters);
+            } else if (definition.creator.isStatic()) {
+                return CodeBlock.of(
+                        "$T.$N($L)",
+                        PoetUtil.toTypeName(definition.creator.getDeclaringType()),
+                        definition.creator.getName(),
+                        creatorParameters
+                );
+            } else {
+                throw new AssertionError("bad creator, should have been detected in BeanIntrospector");
+            }
         }
     }
 

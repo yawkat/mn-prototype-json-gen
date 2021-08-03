@@ -27,6 +27,15 @@ class BeanDefinition {
 
     MethodElement creator;
     List<Property> creatorProps;
+    /**
+     * If the creator is delegating, the property for the single parameter.
+     */
+    Property creatorDelegatingProperty;
+
+    /**
+     * If serialization should be delegating (@JsonValue), the property to use as the value.
+     */
+    Property valueProperty;
 
     List<Property> props;
 

@@ -82,9 +82,14 @@ class BeanIntrospector {
             beanDefinition.creatorProps = Collections.emptyList();
         } else {
             beanDefinition.creator = scanner.creator;
-            beanDefinition.creatorProps = scanner.creatorProps.stream().map(completeProps::get).collect(Collectors.toList());
+            if (scanner.creatorDelegatingProperty == null) {
+                beanDefinition.creatorProps = scanner.creatorProps.stream().map(completeProps::get).collect(Collectors.toList());
+            } else {
+                beanDefinition.creatorDelegatingProperty = completeProps.get(scanner.creatorDelegatingProperty);
+            }
         }
         beanDefinition.ignoreUnknownProperties = scanner.ignoreUnknownProperties;
+        beanDefinition.valueProperty = completeProps.get(scanner.valueProperty);
         return beanDefinition;
     }
 
@@ -101,7 +106,22 @@ class BeanIntrospector {
         MethodElement defaultConstructor;
 
         MethodElement creator = null;
+        /**
+         * Properties for the {@link #creator} parameters.
+         */
         List<PropBuilder> creatorProps;
+        /**
+         * If the creator is delegating, the property for the single parameter.
+         * <p>
+         * We use a "fake" property here, even though it's a bit unlike other properties, so that we can use modifying
+         * annotations, e.g. for null handling.
+         */
+        PropBuilder creatorDelegatingProperty;
+
+        /**
+         * Single property annotated with @JsonValue
+         */
+        PropBuilder valueProperty;
 
         boolean ignoreUnknownProperties;
 
@@ -231,6 +251,15 @@ class BeanIntrospector {
             }
 
             for (PropBuilder prop : byName.values()) {
+                if (prop.annotatedElementsInOrder(forSerialization)
+                        .anyMatch(element -> element.hasAnnotation(JsonValue.class))) {
+                    if (valueProperty != null) {
+                        problemReporter.fail("Multiple properties annotated with @JsonValue",
+                                prop.annotatedElementsInOrder(forSerialization).findFirst().get());
+                    }
+                    valueProperty = prop;
+                }
+
                 // if there's a @RecursiveSerialization on *any* of the involved elements, mark the property for recursive ser
                 prop.permitRecursiveSerialization = prop.annotatedElementsInOrder(forSerialization)
                         .anyMatch(element -> element.hasAnnotation(RecursiveSerialization.class));
@@ -268,6 +297,8 @@ class BeanIntrospector {
                             }
                         })
                         .collect(Collectors.toSet());
+
+
             }
         }
 
@@ -299,15 +330,21 @@ class BeanIntrospector {
                 problemReporter.fail("@JsonCreator annotation cannot be placed on instance methods", method);
                 return;
             }
+            if (creator != null) {
+                problemReporter.fail("Multiple creators configured", method);
+            }
 
+            creator = method;
             if (delegating) {
-                // todo
-                problemReporter.fail("Delegating creator not yet supported", method);
-            } else {
-                if (creator != null) {
-                    problemReporter.fail("Multiple creators configured", method);
+                if (parameters.length != 1) {
+                    problemReporter.fail("Delegating creator must have exactly one parameter", method);
+                    creator = null;
+                    return;
                 }
-                creator = method;
+                // create a fake property
+                creatorDelegatingProperty = getByName(UUID.randomUUID().toString());
+                creatorDelegatingProperty.creatorParameter = parameters[0];
+            } else {
                 creatorProps = new ArrayList<>();
                 for (ParameterElement parameter : parameters) {
                     AnnotationValue<JsonProperty> propertyAnnotation = parameter.getAnnotation(JsonProperty.class);
