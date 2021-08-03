@@ -372,6 +372,31 @@ class Test {
         des.foo == "1"
     }
 
+    void "json ignore"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.*;
+@JsonIgnoreProperties(ignoreUnknown = true)
+class Test {
+    @JsonIgnore String foo;
+    String bar;
+}
+''')
+
+        def des = deserializeFromString(compiled.serializer, '{"foo": "1", "bar": "2"}')
+        def testBean = compiled.newInstance()
+        testBean.foo = "1"
+        testBean.bar = "2"
+        def serialized = serializeToString(compiled.serializer, testBean)
+
+        expect:
+        des.foo == null
+        des.bar == "2"
+        serialized == '{"bar":"2"}'
+    }
+
     void "nullable"() {
         given:
         def compiled = buildSerializer('''

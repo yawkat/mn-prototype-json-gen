@@ -41,6 +41,8 @@ class BeanIntrospector {
         BeanDefinition beanDefinition = new BeanDefinition();
         Map<PropBuilder, BeanDefinition.Property> completeProps = new LinkedHashMap<>();
         for (PropBuilder prop : scanner.byName.values()) {
+            // remove accessors marked as @JsonIgnore
+            prop.trimIgnore(forSerialization);
             // remove hidden accessors
             prop.trimInaccessible(forSerialization);
             // filter out properties based on whether they're read/write-only
@@ -393,6 +395,37 @@ class BeanIntrospector {
             }
             if (field != null && (!field.isAccessible() || (!forSerialization && field.accessor.isFinal()))) {
                 field = null;
+            }
+        }
+
+        void trimIgnore(boolean forSerialization) {
+            // First, remove accessors that are marked as @JsonIgnore.
+            // Only consider accessors relevant for the serialization direction.
+            boolean anyIgnore = false;
+            if (forSerialization && getter != null && getter.type == AccessorType.IGNORABLE) {
+                getter = null;
+                anyIgnore = true;
+            }
+            if (!forSerialization && setter != null && setter.type == AccessorType.IGNORABLE) {
+                setter = null;
+                anyIgnore = true;
+            }
+            if (field != null && field.type == AccessorType.IGNORABLE) {
+                field = null;
+                anyIgnore = true;
+            }
+            // If *any* of the accessors were ignored, was there an explicit @JsonProperty on the other accessor?
+            // If not, remove that accessor as well.
+            if (anyIgnore) {
+                boolean anyExplicit = Stream.of(field, forSerialization ? getter : setter)
+                        .filter(Objects::nonNull)
+                        .anyMatch(acc -> acc.type == AccessorType.EXPLICIT || acc.type == AccessorType.VISIBLE);
+                if (!anyExplicit) {
+                    field = null;
+                    getter = null;
+                    setter = null;
+                    // note: the property could still be usable if it is a @JsonCreator parameter.
+                }
             }
         }
 
