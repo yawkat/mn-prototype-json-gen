@@ -284,13 +284,15 @@ public class InlineBeanSerializerSymbol implements SerializerSymbol {
             }
 
             // unknown properties
-            if (!rootDefinition.ignoreUnknownProperties) {
-                deserialize.beginControlFlow("default:");
+            deserialize.beginControlFlow("default:");
+            if (rootDefinition.ignoreUnknownProperties) {
+                deserialize.addStatement("$N.skipChildren()", DECODER);
+            } else {
                 // todo: do we really want to output a potentially attacker-controlled field name to the logs here?
                 deserialize.addStatement("throw $T.from($N, $S + $N)",
                         JsonParseException.class, DECODER, "Unknown property for type " + rootType.getName() + ": ", fieldNameVariable);
-                deserialize.endControlFlow();
             }
+            deserialize.endControlFlow();
 
             deserialize.endControlFlow();
             deserialize.endControlFlow();

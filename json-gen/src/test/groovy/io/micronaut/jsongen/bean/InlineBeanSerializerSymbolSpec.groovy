@@ -372,6 +372,24 @@ class Test {
         des.foo == "1"
     }
 
+    void "unknown properties with proper annotation, complex"() {
+        given:
+        def compiled = buildSerializer('''
+package example;
+
+import com.fasterxml.jackson.annotation.*;
+@JsonIgnoreProperties(ignoreUnknown = true)
+class Test {
+    String foo;
+}
+''')
+
+        def des = deserializeFromString(compiled.serializer, '{"foo": "1", "bar": [1, 2]}')
+
+        expect:
+        des.foo == "1"
+    }
+
     void "json ignore"() {
         given:
         def compiled = buildSerializer('''
